@@ -1,6 +1,6 @@
 package com.ridelink.driver.dto;
 
-import com.ridelink.driver.model.AvailabilityStatus;
+import com.ridelink.driver.entity.AvailabilityStatus;
 import jakarta.validation.constraints.NotNull;
 
 public class UpdateAvailabilityRequest {

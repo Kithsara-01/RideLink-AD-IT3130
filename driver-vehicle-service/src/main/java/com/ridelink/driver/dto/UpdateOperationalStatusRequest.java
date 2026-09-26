@@ -1,6 +1,6 @@
 package com.ridelink.driver.dto;
 
-import com.ridelink.driver.model.OperationalStatus;
+import com.ridelink.driver.entity.OperationalStatus;
 import jakarta.validation.constraints.NotNull;
 
 public class UpdateOperationalStatusRequest {

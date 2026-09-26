@@ -1,8 +1,8 @@
 package com.ridelink.driver.dto;
 
-import com.ridelink.driver.model.Driver;
-import com.ridelink.driver.model.Location;
-import com.ridelink.driver.model.Vehicle;
+import com.ridelink.driver.entity.Driver;
+import com.ridelink.driver.entity.Location;
+import com.ridelink.driver.entity.Vehicle;
 
 public class AvailableDriverResponse {
 

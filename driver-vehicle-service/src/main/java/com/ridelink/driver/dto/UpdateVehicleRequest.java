@@ -1,6 +1,6 @@
 package com.ridelink.driver.dto;
 
-import com.ridelink.driver.model.VehicleType;
+import com.ridelink.driver.entity.VehicleType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;

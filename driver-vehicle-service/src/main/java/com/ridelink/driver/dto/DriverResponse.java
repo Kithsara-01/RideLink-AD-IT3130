@@ -1,10 +1,10 @@
 package com.ridelink.driver.dto;
 
-import com.ridelink.driver.model.AvailabilityStatus;
-import com.ridelink.driver.model.Driver;
-import com.ridelink.driver.model.Location;
-import com.ridelink.driver.model.OperationalStatus;
-import com.ridelink.driver.model.Vehicle;
+import com.ridelink.driver.entity.AvailabilityStatus;
+import com.ridelink.driver.entity.Driver;
+import com.ridelink.driver.entity.Location;
+import com.ridelink.driver.entity.OperationalStatus;
+import com.ridelink.driver.entity.Vehicle;
 
 import java.time.Instant;
 

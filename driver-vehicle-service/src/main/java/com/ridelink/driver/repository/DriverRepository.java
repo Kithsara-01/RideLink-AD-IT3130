@@ -1,8 +1,8 @@
 package com.ridelink.driver.repository;
 
-import com.ridelink.driver.model.AvailabilityStatus;
-import com.ridelink.driver.model.Driver;
-import com.ridelink.driver.model.OperationalStatus;
+import com.ridelink.driver.entity.AvailabilityStatus;
+import com.ridelink.driver.entity.Driver;
+import com.ridelink.driver.entity.OperationalStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
