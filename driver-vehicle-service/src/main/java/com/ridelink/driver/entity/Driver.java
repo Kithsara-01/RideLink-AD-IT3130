@@ -1,4 +1,4 @@
-package com.ridelink.driver.model;
+package com.ridelink.driver.entity;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;

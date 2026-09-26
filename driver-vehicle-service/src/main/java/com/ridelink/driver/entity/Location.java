@@ -1,4 +1,4 @@
-package com.ridelink.driver.model;
+package com.ridelink.driver.entity;
 
 import java.time.Instant;
 
