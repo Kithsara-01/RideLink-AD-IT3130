@@ -2,46 +2,89 @@ package com.ridelink.account.service;
 
 import com.ridelink.account.dto.RegisterRequest;
 import com.ridelink.account.entity.User;
+import com.ridelink.account.exception.ApiException;
 import com.ridelink.account.repository.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.Locale;
 
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final BCryptPasswordEncoder passwordEncoder =
+            new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
     public User register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already registered");
+        String email = normalizeEmail(request.getEmail());
+
+        String role = request.getRole() == null
+                ? ""
+                : request.getRole().trim().toUpperCase(Locale.ROOT);
+
+        if (!role.equals("RIDER") && !role.equals("DRIVER")) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "Role must be RIDER or DRIVER"
+            );
+        }
+
+        if (userRepository.existsByEmail(email)) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "Email already registered"
+            );
         }
 
         User user = new User(
-                request.getFullName(),
-                request.getEmail(),
+                request.getFullName().trim(),
+                email,
                 passwordEncoder.encode(request.getPassword()),
-                request.getRole());
+                role
+        );
 
         return userRepository.save(user);
     }
 
     public User findByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        return userRepository.findByEmail(normalizeEmail(email))
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "User not found"
+                ));
     }
 
     public User authenticate(String email, String password) {
-        User user = findByEmail(email);
+        User user = userRepository.findByEmail(normalizeEmail(email))
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.UNAUTHORIZED,
+                        "Invalid email or password"
+                ));
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Invalid email or password");
+            throw new ApiException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Invalid email or password"
+            );
+        }
+
+        if (!user.isActive()) {
+            throw new ApiException(
+                    HttpStatus.FORBIDDEN,
+                    "Account is inactive"
+            );
         }
 
         return user;
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

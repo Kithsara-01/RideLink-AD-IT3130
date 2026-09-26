@@ -29,6 +29,7 @@ public class AccountController {
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 Map.of(
+                        "message", "Account registered successfully",
                         "id", user.getId(),
                         "fullName", user.getFullName(),
                         "email", user.getEmail(),
@@ -49,6 +50,7 @@ public class AccountController {
 
         return ResponseEntity.ok(
                 Map.of(
+                        "message", "Credentials verified successfully",
                         "id", user.getId(),
                         "fullName", user.getFullName(),
                         "email", user.getEmail(),
@@ -65,6 +67,7 @@ public class AccountController {
 
         return ResponseEntity.ok(
                 Map.of(
+                        "message", "Account retrieved successfully",
                         "id", user.getId(),
                         "fullName", user.getFullName(),
                         "email", user.getEmail(),
