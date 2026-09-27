@@ -19,6 +19,12 @@ public class SecurityConfig {
                                 "/api/fares/rides/**",
                                 "/api/payments/**",
                                 "/api/receipts/**",
+
+                                // Swagger / OpenAPI
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+
                                 "/error"
                         ).permitAll()
                         .anyRequest().authenticated()
