@@ -18,6 +18,7 @@ public class SecurityConfig {
                                 "/api/fares/estimate",
                                 "/api/fares/rides/**",
                                 "/api/payments/**",
+                                "/api/receipts/**",
                                 "/error"
                         ).permitAll()
                         .anyRequest().authenticated()

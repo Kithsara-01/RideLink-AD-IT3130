@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
 
         return buildResponse(
                 HttpStatus.CONFLICT,
-                "A record already exists for this ride");
+                "A duplicate record already exists");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -60,6 +60,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PaymentNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handlePaymentNotFound(
             PaymentNotFoundException ex) {
+
+        return buildResponse(
+                HttpStatus.NOT_FOUND,
+                ex.getMessage());
+    }
+
+    @ExceptionHandler(ReceiptNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleReceiptNotFound(
+            ReceiptNotFoundException ex) {
 
         return buildResponse(
                 HttpStatus.NOT_FOUND,

@@ -1,6 +1,7 @@
 package com.ridelink.payment.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -8,6 +9,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 @Document(collection = "payments")
+@CompoundIndex(
+        name = "receipt_number_unique",
+        def = "{'receipt.receiptNumber': 1}",
+        unique = true,
+        sparse = true
+)
 public class Payment {
 
     @Id
@@ -25,6 +32,8 @@ public class Payment {
     private Instant createdAt;
     private Instant updatedAt;
     private Instant paidAt;
+
+    private Receipt receipt;
 
     public Payment() {
     }
@@ -115,5 +124,13 @@ public class Payment {
 
     public void setPaidAt(Instant paidAt) {
         this.paidAt = paidAt;
+    }
+
+    public Receipt getReceipt() {
+        return receipt;
+    }
+
+    public void setReceipt(Receipt receipt) {
+        this.receipt = receipt;
     }
 }

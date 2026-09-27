@@ -2,6 +2,7 @@ package com.ridelink.payment.controller;
 
 import com.ridelink.payment.dto.PaymentRequest;
 import com.ridelink.payment.dto.PaymentResponse;
+import com.ridelink.payment.dto.ReceiptResponse;
 import com.ridelink.payment.service.PaymentService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -39,5 +40,13 @@ public class PaymentController {
 
         return ResponseEntity.ok(
                 paymentService.getPaymentByRideId(rideId));
+    }
+
+    @GetMapping("/{paymentId}/receipt")
+    public ResponseEntity<ReceiptResponse> getReceiptByPaymentId(
+            @PathVariable String paymentId) {
+
+        return ResponseEntity.ok(
+                paymentService.getReceiptByPaymentId(paymentId));
     }
 }
