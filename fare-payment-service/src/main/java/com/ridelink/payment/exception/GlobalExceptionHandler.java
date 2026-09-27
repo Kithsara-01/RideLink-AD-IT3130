@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
 
         return buildResponse(
                 HttpStatus.CONFLICT,
-                "Final fare already exists for this ride");
+                "A record already exists for this ride");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -40,7 +40,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(FinalFareNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleNotFound(
+    public ResponseEntity<Map<String, Object>> handleFinalFareNotFound(
             FinalFareNotFoundException ex) {
 
         return buildResponse(
@@ -49,8 +49,26 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(FinalFareAlreadyExistsException.class)
-    public ResponseEntity<Map<String, Object>> handleConflict(
+    public ResponseEntity<Map<String, Object>> handleFinalFareConflict(
             FinalFareAlreadyExistsException ex) {
+
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                ex.getMessage());
+    }
+
+    @ExceptionHandler(PaymentNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handlePaymentNotFound(
+            PaymentNotFoundException ex) {
+
+        return buildResponse(
+                HttpStatus.NOT_FOUND,
+                ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidPaymentStateException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidPaymentState(
+            InvalidPaymentStateException ex) {
 
         return buildResponse(
                 HttpStatus.CONFLICT,
