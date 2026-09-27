@@ -1,6 +1,9 @@
 package com.ridelink.ride.config;
 
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
@@ -12,7 +15,15 @@ public class OpenApiConfig {
 
     @Bean
     public OpenAPI rideManagementServiceOpenAPI() {
-        return new OpenAPI().info(new Info()
+        return new OpenAPI()
+            .components(new Components().addSecuritySchemes("bearerAuth",
+                new SecurityScheme()
+                    .name("Authorization")
+                    .type(SecurityScheme.Type.HTTP)
+                    .scheme("bearer")
+                    .bearerFormat("JWT")))
+            .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
+            .info(new Info()
             .title("RideLink - Ride Management Service API")
             .description("Ride request creation, driver assignment, lifecycle state management and simulated fare snapshots.")
             .version("1.0.0")
