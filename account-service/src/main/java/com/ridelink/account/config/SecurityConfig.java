@@ -92,6 +92,11 @@ public class SecurityConfig {
                                                                 "/api/accounts/*/status")
                                                 .hasRole("ADMIN")
 
+                                                .requestMatchers(
+                                                                HttpMethod.PATCH,
+                                                                "/api/accounts/*/role")
+                                                .hasRole("ADMIN")
+
                                                 .anyRequest().denyAll())
 
                                 .oauth2ResourceServer(oauth2 -> oauth2
