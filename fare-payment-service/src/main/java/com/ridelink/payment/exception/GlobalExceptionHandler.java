@@ -1,5 +1,6 @@
 package com.ridelink.payment.exception;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -12,6 +13,15 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<Map<String, Object>> handleDuplicateKeyException(
+            DuplicateKeyException ex) {
+
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "A duplicate record already exists");
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(
@@ -26,28 +36,52 @@ public class GlobalExceptionHandler {
 
         return buildResponse(
                 HttpStatus.BAD_REQUEST,
-                message
-        );
+                message);
     }
 
     @ExceptionHandler(FinalFareNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleNotFound(
+    public ResponseEntity<Map<String, Object>> handleFinalFareNotFound(
             FinalFareNotFoundException ex) {
 
         return buildResponse(
                 HttpStatus.NOT_FOUND,
-                ex.getMessage()
-        );
+                ex.getMessage());
     }
 
     @ExceptionHandler(FinalFareAlreadyExistsException.class)
-    public ResponseEntity<Map<String, Object>> handleConflict(
+    public ResponseEntity<Map<String, Object>> handleFinalFareConflict(
             FinalFareAlreadyExistsException ex) {
 
         return buildResponse(
                 HttpStatus.CONFLICT,
-                ex.getMessage()
-        );
+                ex.getMessage());
+    }
+
+    @ExceptionHandler(PaymentNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handlePaymentNotFound(
+            PaymentNotFoundException ex) {
+
+        return buildResponse(
+                HttpStatus.NOT_FOUND,
+                ex.getMessage());
+    }
+
+    @ExceptionHandler(ReceiptNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleReceiptNotFound(
+            ReceiptNotFoundException ex) {
+
+        return buildResponse(
+                HttpStatus.NOT_FOUND,
+                ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidPaymentStateException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidPaymentState(
+            InvalidPaymentStateException ex) {
+
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                ex.getMessage());
     }
 
     private ResponseEntity<Map<String, Object>> buildResponse(
