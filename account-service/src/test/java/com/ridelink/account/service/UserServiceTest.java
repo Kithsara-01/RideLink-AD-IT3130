@@ -197,4 +197,105 @@ class UserServiceTest {
 
                 verify(userRepository, never()).save(any(User.class));
         }
+
+        @Test
+        void changingAccountRoleIncrementsTokenVersion() {
+                User admin = new User(
+                                "Admin",
+                                "admin@ridelink.com",
+                                "stored-password-hash",
+                                "ADMIN");
+                admin.setId("admin-1");
+
+                User rider = new User(
+                                "Kamal",
+                                "kamal@example.com",
+                                "stored-password-hash",
+                                "RIDER");
+                rider.setId("user-1");
+                rider.setTokenVersion(0);
+
+                when(userRepository.findById("admin-1"))
+                                .thenReturn(Optional.of(admin));
+                when(userRepository.findById("user-1"))
+                                .thenReturn(Optional.of(rider));
+                when(userRepository.save(any(User.class)))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
+
+                User updatedUser = userService.updateAccountRole(
+                                "admin-1",
+                                "user-1",
+                                "DRIVER");
+
+                assertEquals("DRIVER", updatedUser.getRole());
+                assertEquals(1, updatedUser.getTokenVersion());
+
+                verify(userRepository).save(rider);
+        }
+
+        @Test
+        void changingAccountStatusIncrementsTokenVersion() {
+                User admin = new User(
+                                "Admin",
+                                "admin@ridelink.com",
+                                "stored-password-hash",
+                                "ADMIN");
+                admin.setId("admin-1");
+
+                User rider = new User(
+                                "Kamal",
+                                "kamal@example.com",
+                                "stored-password-hash",
+                                "RIDER");
+                rider.setId("user-1");
+                rider.setTokenVersion(1);
+
+                when(userRepository.findById("admin-1"))
+                                .thenReturn(Optional.of(admin));
+                when(userRepository.findById("user-1"))
+                                .thenReturn(Optional.of(rider));
+                when(userRepository.save(any(User.class)))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
+
+                User updatedUser = userService.updateAccountStatus(
+                                "admin-1",
+                                "user-1",
+                                false);
+
+                assertFalse(updatedUser.isActive());
+                assertEquals(2, updatedUser.getTokenVersion());
+
+                verify(userRepository).save(rider);
+        }
+
+        @Test
+        void unchangedRoleDoesNotIncrementTokenVersion() {
+                User admin = new User(
+                                "Admin",
+                                "admin@ridelink.com",
+                                "stored-password-hash",
+                                "ADMIN");
+                admin.setId("admin-1");
+
+                User rider = new User(
+                                "Kamal",
+                                "kamal@example.com",
+                                "stored-password-hash",
+                                "RIDER");
+                rider.setId("user-1");
+                rider.setTokenVersion(2);
+
+                when(userRepository.findById("admin-1"))
+                                .thenReturn(Optional.of(admin));
+                when(userRepository.findById("user-1"))
+                                .thenReturn(Optional.of(rider));
+
+                User unchangedUser = userService.updateAccountRole(
+                                "admin-1",
+                                "user-1",
+                                "RIDER");
+
+                assertEquals(2, unchangedUser.getTokenVersion());
+                verify(userRepository, never()).save(any(User.class));
+        }
 }

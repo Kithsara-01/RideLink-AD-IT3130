@@ -4,6 +4,7 @@ import com.ridelink.account.dto.RegisterRequest;
 import com.ridelink.account.entity.User;
 import com.ridelink.account.exception.ApiException;
 import com.ridelink.account.repository.UserRepository;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -14,7 +15,8 @@ import java.util.Locale;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final BCryptPasswordEncoder passwordEncoder =
+            new BCryptPasswordEncoder();
 
     public UserService(UserRepository userRepository) {
         this.userRepository = userRepository;
@@ -124,7 +126,12 @@ public class UserService {
                     "Only RIDER and DRIVER account status can be changed");
         }
 
+        if (user.isActive() == active) {
+            return user;
+        }
+
         user.setActive(active);
+        user.setTokenVersion(user.getTokenVersion() + 1);
 
         return userRepository.save(user);
     }
@@ -162,7 +169,12 @@ public class UserService {
                     "Role must be RIDER or DRIVER");
         }
 
+        if (role.equals(user.getRole())) {
+            return user;
+        }
+
         user.setRole(role);
+        user.setTokenVersion(user.getTokenVersion() + 1);
 
         return userRepository.save(user);
     }
