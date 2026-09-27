@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 import com.ridelink.account.entity.User;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -28,8 +29,7 @@ public class JwtService {
 
         if (expirationSeconds <= 0) {
             throw new IllegalArgumentException(
-                    "JWT expiration must be greater than zero"
-            );
+                    "JWT expiration must be greater than zero");
         }
 
         this.jwtEncoder = jwtEncoder;
@@ -48,6 +48,7 @@ public class JwtService {
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(expirationSeconds))
                 .claim("role", user.getRole())
+                .claim("tokenVersion", user.getTokenVersion())
                 .build();
 
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256)
