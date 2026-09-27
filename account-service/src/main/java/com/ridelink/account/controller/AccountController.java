@@ -4,6 +4,9 @@ import java.util.Map;
 
 import com.ridelink.account.dto.LoginRequest;
 import com.ridelink.account.dto.RegisterRequest;
+import com.ridelink.account.dto.UpdateAccountRoleRequest;
+import com.ridelink.account.dto.UpdateAccountStatusRequest;
+import com.ridelink.account.dto.UpdateProfileRequest;
 import com.ridelink.account.entity.User;
 import com.ridelink.account.service.JwtService;
 import com.ridelink.account.service.UserService;
@@ -15,10 +18,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-
-import com.ridelink.account.dto.UpdateProfileRequest;
-
-import com.ridelink.account.dto.UpdateAccountStatusRequest;
 
 @RestController
 @RequestMapping("/api/accounts")
@@ -112,7 +111,8 @@ public class AccountController {
         }
 
         @GetMapping("/email/{email}")
-        public ResponseEntity<?> getByEmail(@PathVariable String email) {
+        public ResponseEntity<?> getByEmail(
+                        @PathVariable String email) {
 
                 User user = userService.findByEmail(email);
 
@@ -147,4 +147,24 @@ public class AccountController {
                                                 "active", user.isActive()));
         }
 
+        @PatchMapping("/{accountId}/role")
+        public ResponseEntity<?> updateAccountRole(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable String accountId,
+                        @Valid @RequestBody UpdateAccountRoleRequest request) {
+
+                User user = userService.updateAccountRole(
+                                jwt.getSubject(),
+                                accountId,
+                                request.getRole());
+
+                return ResponseEntity.ok(
+                                Map.of(
+                                                "message", "Account role updated successfully",
+                                                "id", user.getId(),
+                                                "fullName", user.getFullName(),
+                                                "email", user.getEmail(),
+                                                "role", user.getRole(),
+                                                "active", user.isActive()));
+        }
 }
