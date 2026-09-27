@@ -99,6 +99,36 @@ public class UserService {
                 return userRepository.save(user);
         }
 
+        public User updateAccountStatus(
+                        String adminId,
+                        String accountId,
+                        boolean active) {
+
+                User admin = findActiveById(adminId);
+
+                if (!"ADMIN".equals(admin.getRole())) {
+                        throw new ApiException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Only an admin can change account status");
+                }
+
+                User user = userRepository.findById(accountId)
+                                .orElseThrow(() -> new ApiException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Account not found"));
+
+                if (!"RIDER".equals(user.getRole())
+                                && !"DRIVER".equals(user.getRole())) {
+                        throw new ApiException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Only RIDER and DRIVER account status can be changed");
+                }
+
+                user.setActive(active);
+
+                return userRepository.save(user);
+        }
+
         private String normalizeEmail(String email) {
                 return email.trim().toLowerCase(Locale.ROOT);
         }

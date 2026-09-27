@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 
 import com.ridelink.account.dto.UpdateProfileRequest;
 
+import com.ridelink.account.dto.UpdateAccountStatusRequest;
+
 @RestController
 @RequestMapping("/api/accounts")
 public class AccountController {
@@ -123,4 +125,26 @@ public class AccountController {
                                                 "role", user.getRole(),
                                                 "active", user.isActive()));
         }
+
+        @PatchMapping("/{accountId}/status")
+        public ResponseEntity<?> updateAccountStatus(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable String accountId,
+                        @Valid @RequestBody UpdateAccountStatusRequest request) {
+
+                User user = userService.updateAccountStatus(
+                                jwt.getSubject(),
+                                accountId,
+                                request.getActive());
+
+                return ResponseEntity.ok(
+                                Map.of(
+                                                "message", "Account status updated successfully",
+                                                "id", user.getId(),
+                                                "fullName", user.getFullName(),
+                                                "email", user.getEmail(),
+                                                "role", user.getRole(),
+                                                "active", user.isActive()));
+        }
+
 }
