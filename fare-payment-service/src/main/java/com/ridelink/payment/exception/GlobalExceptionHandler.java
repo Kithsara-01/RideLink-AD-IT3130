@@ -1,5 +1,6 @@
 package com.ridelink.payment.exception;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -12,6 +13,15 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<Map<String, Object>> handleDuplicateKeyException(
+            DuplicateKeyException ex) {
+
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "Final fare already exists for this ride");
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(
@@ -26,8 +36,7 @@ public class GlobalExceptionHandler {
 
         return buildResponse(
                 HttpStatus.BAD_REQUEST,
-                message
-        );
+                message);
     }
 
     @ExceptionHandler(FinalFareNotFoundException.class)
@@ -36,8 +45,7 @@ public class GlobalExceptionHandler {
 
         return buildResponse(
                 HttpStatus.NOT_FOUND,
-                ex.getMessage()
-        );
+                ex.getMessage());
     }
 
     @ExceptionHandler(FinalFareAlreadyExistsException.class)
@@ -46,8 +54,7 @@ public class GlobalExceptionHandler {
 
         return buildResponse(
                 HttpStatus.CONFLICT,
-                ex.getMessage()
-        );
+                ex.getMessage());
     }
 
     private ResponseEntity<Map<String, Object>> buildResponse(
