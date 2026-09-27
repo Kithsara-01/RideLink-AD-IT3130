@@ -11,6 +11,10 @@ import com.ridelink.account.entity.User;
 import com.ridelink.account.service.JwtService;
 import com.ridelink.account.service.UserService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
@@ -21,6 +25,10 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/accounts")
+@Tag(
+        name = "Account Management",
+        description = "APIs for account registration, authentication, profile management, and administrator account management"
+)
 public class AccountController {
 
         private final UserService userService;
@@ -33,6 +41,10 @@ public class AccountController {
                 this.jwtService = jwtService;
         }
 
+        @Operation(
+                summary = "Register a new account",
+                description = "Creates a new RIDER or DRIVER account."
+        )
         @PostMapping("/register")
         public ResponseEntity<?> register(
                         @Valid @RequestBody RegisterRequest request) {
@@ -49,6 +61,10 @@ public class AccountController {
                                                 "active", user.isActive()));
         }
 
+        @Operation(
+                summary = "Login to an account",
+                description = "Authenticates an account and returns a JWT access token."
+        )
         @PostMapping("/login")
         public ResponseEntity<?> login(
                         @Valid @RequestBody LoginRequest request) {
@@ -75,6 +91,11 @@ public class AccountController {
                                                                 "active", user.isActive()));
         }
 
+        @Operation(
+                summary = "Get current account profile",
+                description = "Returns the profile of the currently authenticated RIDER, DRIVER, or ADMIN.",
+                security = @SecurityRequirement(name = "bearerAuth")
+        )
         @GetMapping("/me")
         public ResponseEntity<?> getCurrentAccount(
                         @AuthenticationPrincipal Jwt jwt) {
@@ -91,6 +112,11 @@ public class AccountController {
                                                 "active", user.isActive()));
         }
 
+        @Operation(
+                summary = "Update current account profile",
+                description = "Updates the profile information of the currently authenticated account.",
+                security = @SecurityRequirement(name = "bearerAuth")
+        )
         @PatchMapping("/me")
         public ResponseEntity<?> updateProfile(
                         @AuthenticationPrincipal Jwt jwt,
@@ -110,6 +136,11 @@ public class AccountController {
                                                 "active", user.isActive()));
         }
 
+        @Operation(
+                summary = "Find an account by email",
+                description = "Allows an ADMIN to retrieve an account using its email address.",
+                security = @SecurityRequirement(name = "bearerAuth")
+        )
         @GetMapping("/email/{email}")
         public ResponseEntity<?> getByEmail(
                         @PathVariable String email) {
@@ -126,6 +157,11 @@ public class AccountController {
                                                 "active", user.isActive()));
         }
 
+        @Operation(
+                summary = "Update account status",
+                description = "Allows an ADMIN to activate or deactivate a RIDER or DRIVER account.",
+                security = @SecurityRequirement(name = "bearerAuth")
+        )
         @PatchMapping("/{accountId}/status")
         public ResponseEntity<?> updateAccountStatus(
                         @AuthenticationPrincipal Jwt jwt,
@@ -147,6 +183,11 @@ public class AccountController {
                                                 "active", user.isActive()));
         }
 
+        @Operation(
+                summary = "Update account role",
+                description = "Allows an ADMIN to change an account role between RIDER and DRIVER.",
+                security = @SecurityRequirement(name = "bearerAuth")
+        )
         @PatchMapping("/{accountId}/role")
         public ResponseEntity<?> updateAccountRole(
                         @AuthenticationPrincipal Jwt jwt,
