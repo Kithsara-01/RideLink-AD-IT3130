@@ -47,6 +47,8 @@ public class UserService {
                 passwordEncoder.encode(request.getPassword()),
                 role);
 
+        user.setTelephoneNumber(request.getTelephoneNumber());
+
         return userRepository.save(user);
     }
 
@@ -93,10 +95,18 @@ public class UserService {
         return user;
     }
 
-    public User updateProfile(String userId, String fullName) {
+    public User updateProfile(
+            String userId,
+            String fullName,
+            String telephoneNumber) {
+
         User user = findActiveById(userId);
 
         user.setFullName(fullName.trim());
+
+        if (telephoneNumber != null) {
+            user.setTelephoneNumber(telephoneNumber.trim());
+        }
 
         return userRepository.save(user);
     }
