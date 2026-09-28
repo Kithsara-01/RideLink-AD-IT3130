@@ -34,18 +34,18 @@ public class SecurityConfig {
             response.getWriter().write("{\"status\":401,\"message\":\"Authentication required or invalid token\"}");
         };
         http.csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/rides").hasAnyRole("RIDER", "ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/rides/*/assign").hasAnyRole("RIDER", "ADMIN")
-                .requestMatchers(HttpMethod.PATCH, "/api/rides/*/status").hasAnyRole("RIDER", "DRIVER", "ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/rides/**").hasAnyRole("RIDER", "DRIVER", "ADMIN")
-                .anyRequest().denyAll())
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
-                .authenticationEntryPoint(unauthorized))
-            .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(unauthorized));
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/rides").hasRole("RIDER")
+                        .requestMatchers(HttpMethod.POST, "/api/rides/*/assign").hasAnyRole("RIDER", "ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/rides/*/status").hasAnyRole("RIDER", "DRIVER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/rides/**").hasAnyRole("RIDER", "DRIVER", "ADMIN")
+                        .anyRequest().denyAll())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
+                        .authenticationEntryPoint(unauthorized))
+                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(unauthorized));
         return http.build();
     }
 }
