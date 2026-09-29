@@ -24,6 +24,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,7 +34,9 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -57,6 +60,7 @@ class DriverControllerTest {
 
     @BeforeEach
     void setUp() {
+
         Vehicle vehicle = new Vehicle(
                 "Toyota",
                 "Prius",
@@ -89,10 +93,10 @@ class DriverControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/drivers - should return 201 Created on valid request")
-    void testRegisterDriver_Valid() throws Exception {
+    @DisplayName("POST /api/drivers - DRIVER JWT should return 201 Created")
+    void testRegisterDriver_ValidDriverJwt() throws Exception {
 
-        VehicleDto vDto = new VehicleDto(
+        VehicleDto vehicleDto = new VehicleDto(
                 "Toyota",
                 "Prius",
                 2021,
@@ -102,26 +106,37 @@ class DriverControllerTest {
                 4
         );
 
-        LocationDto lDto = new LocationDto(
+        LocationDto locationDto = new LocationDto(
                 6.9271,
                 79.8612,
                 "Fort Colombo"
         );
 
         CreateDriverRequest request = new CreateDriverRequest(
-                "usr-456",
                 "DL-12345",
                 "+94771234567",
                 "Colombo",
-                vDto,
-                lDto
+                vehicleDto,
+                locationDto
         );
 
-        when(driverService.registerDriver(any(CreateDriverRequest.class)))
-                .thenReturn(sampleResponse);
+        when(
+                driverService.registerDriver(
+                        any(CreateDriverRequest.class),
+                        eq("driver-jwt-token")
+                )
+        ).thenReturn(sampleResponse);
 
         mockMvc.perform(
                         post("/api/drivers")
+                                .with(
+                                        jwt()
+                                                .jwt(jwt -> jwt
+                                                        .tokenValue("driver-jwt-token")
+                                                        .claim("role", "DRIVER")
+                                                )
+                                                .authorities(() -> "ROLE_DRIVER")
+                                )
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request))
                 )
@@ -129,13 +144,18 @@ class DriverControllerTest {
                 .andExpect(jsonPath("$.id").value("drv-123"))
                 .andExpect(jsonPath("$.userId").value("usr-456"))
                 .andExpect(jsonPath("$.operationalStatus").value("ACTIVE"));
+
+        verify(driverService).registerDriver(
+                any(CreateDriverRequest.class),
+                eq("driver-jwt-token")
+        );
     }
 
     @Test
-    @DisplayName("POST /api/drivers - should return 400 Bad Request on invalid coordinates")
-    void testRegisterDriver_InvalidCoordinates() throws Exception {
+    @DisplayName("POST /api/drivers - RIDER JWT should return 403 Forbidden")
+    void testRegisterDriver_RiderForbidden() throws Exception {
 
-        VehicleDto vDto = new VehicleDto(
+        VehicleDto vehicleDto = new VehicleDto(
                 "Toyota",
                 "Prius",
                 2021,
@@ -145,19 +165,63 @@ class DriverControllerTest {
                 4
         );
 
-        LocationDto lDto = new LocationDto(
-                120.0,
+        LocationDto locationDto = new LocationDto(
+                6.9271,
                 79.8612,
-                "Invalid Location"
+                "Fort Colombo"
         );
 
         CreateDriverRequest request = new CreateDriverRequest(
-                "usr-456",
                 "DL-12345",
                 "+94771234567",
                 "Colombo",
-                vDto,
-                lDto
+                vehicleDto,
+                locationDto
+        );
+
+        mockMvc.perform(
+                        post("/api/drivers")
+                                .with(
+                                        jwt()
+                                                .jwt(jwt -> jwt
+                                                        .tokenValue("rider-jwt-token")
+                                                        .claim("role", "RIDER")
+                                                )
+                                                .authorities(() -> "ROLE_RIDER")
+                                )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                )
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithAnonymousUser
+    @DisplayName("POST /api/drivers - no JWT should return 401 Unauthorized")
+    void testRegisterDriver_NoJwtUnauthorized() throws Exception {
+
+        VehicleDto vehicleDto = new VehicleDto(
+                "Toyota",
+                "Prius",
+                2021,
+                "WP-CAB-1234",
+                "White",
+                VehicleType.SEDAN,
+                4
+        );
+
+        LocationDto locationDto = new LocationDto(
+                6.9271,
+                79.8612,
+                "Fort Colombo"
+        );
+
+        CreateDriverRequest request = new CreateDriverRequest(
+                "DL-12345",
+                "+94771234567",
+                "Colombo",
+                vehicleDto,
+                locationDto
         );
 
         mockMvc.perform(
@@ -165,10 +229,57 @@ class DriverControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request))
                 )
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("POST /api/drivers - should return 400 Bad Request on invalid coordinates")
+    void testRegisterDriver_InvalidCoordinates() throws Exception {
+
+        VehicleDto vehicleDto = new VehicleDto(
+                "Toyota",
+                "Prius",
+                2021,
+                "WP-CAB-1234",
+                "White",
+                VehicleType.SEDAN,
+                4
+        );
+
+        LocationDto locationDto = new LocationDto(
+                120.0,
+                79.8612,
+                "Invalid Location"
+        );
+
+        CreateDriverRequest request = new CreateDriverRequest(
+                "DL-12345",
+                "+94771234567",
+                "Colombo",
+                vehicleDto,
+                locationDto
+        );
+
+        mockMvc.perform(
+                        post("/api/drivers")
+                                .with(
+                                        jwt()
+                                                .jwt(jwt -> jwt
+                                                        .tokenValue("driver-jwt-token")
+                                                        .claim("role", "DRIVER")
+                                                )
+                                                .authorities(() -> "ROLE_DRIVER")
+                                )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                )
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.message").value("Validation failed"))
-                .andExpect(jsonPath("$.errors['initialLocation.latitude']").exists());
+                .andExpect(
+                        jsonPath("$.errors['initialLocation.latitude']")
+                                .exists()
+                );
     }
 
     @Test
@@ -183,7 +294,10 @@ class DriverControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("drv-123"))
-                .andExpect(jsonPath("$.driverLicenseNumber").value("DL-12345"));
+                .andExpect(
+                        jsonPath("$.driverLicenseNumber")
+                                .value("DL-12345")
+                );
     }
 
     @Test

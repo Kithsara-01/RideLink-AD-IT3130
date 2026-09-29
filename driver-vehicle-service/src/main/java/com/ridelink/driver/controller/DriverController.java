@@ -17,6 +17,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,7 +31,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/drivers")
@@ -50,8 +51,15 @@ public class DriverController {
         @ApiResponse(responseCode = "400", description = "Validation failed"),
         @ApiResponse(responseCode = "409", description = "Duplicate user ID, license number, or vehicle plate")
     })
-    public ResponseEntity<DriverResponse> registerDriver(@Valid @RequestBody CreateDriverRequest request) {
-        DriverResponse response = driverService.registerDriver(request);
+    public ResponseEntity<DriverResponse> registerDriver(
+            @Valid @RequestBody CreateDriverRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        DriverResponse response = driverService.registerDriver(
+                request,
+                jwt.getTokenValue()
+        );
+
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -128,9 +136,15 @@ public class DriverController {
             @Parameter(description = "Pickup latitude for proximity calculation") @RequestParam(required = false) Double pickupLat,
             @Parameter(description = "Pickup longitude for proximity calculation") @RequestParam(required = false) Double pickupLng,
             @Parameter(description = "Search radius in km (default 15.0)") @RequestParam(required = false) Double radiusKm) {
+
         List<AvailableDriverResponse> availableDrivers = driverService.findAvailableDrivers(
-            serviceArea, vehicleType, pickupLat, pickupLng, radiusKm
+                serviceArea,
+                vehicleType,
+                pickupLat,
+                pickupLng,
+                radiusKm
         );
+
         return ResponseEntity.ok(availableDrivers);
     }
 

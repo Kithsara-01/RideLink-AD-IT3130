@@ -112,9 +112,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/drivers/**")
-                        .hasAnyRole(
-                                "DRIVER",
-                                "ADMIN")
+                        .hasRole("DRIVER")
 
                         .requestMatchers(
                                 HttpMethod.PUT,

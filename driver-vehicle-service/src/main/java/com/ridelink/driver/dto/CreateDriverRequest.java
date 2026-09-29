@@ -7,15 +7,18 @@ import jakarta.validation.constraints.Pattern;
 
 public class CreateDriverRequest {
 
-    @NotBlank(message = "User ID is required")
-    private String userId;
-
     @NotBlank(message = "Driver license number is required")
-    @Pattern(regexp = "^[A-Za-z0-9-]{5,20}$", message = "Driver license number must be 5-20 characters")
+    @Pattern(
+            regexp = "^[A-Za-z0-9-]{5,20}$",
+            message = "Driver license number must be 5-20 characters"
+    )
     private String driverLicenseNumber;
 
     @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^\\+?[0-9]{9,15}$", message = "Phone number must be a valid international or local format (9-15 digits)")
+    @Pattern(
+            regexp = "^\\+?[0-9]{9,15}$",
+            message = "Phone number must be a valid international or local format (9-15 digits)"
+    )
     private String phoneNumber;
 
     @NotBlank(message = "Service area is required")
@@ -32,21 +35,18 @@ public class CreateDriverRequest {
     public CreateDriverRequest() {
     }
 
-    public CreateDriverRequest(String userId, String driverLicenseNumber, String phoneNumber, String serviceArea, VehicleDto vehicle, LocationDto initialLocation) {
-        this.userId = userId;
+    public CreateDriverRequest(
+            String driverLicenseNumber,
+            String phoneNumber,
+            String serviceArea,
+            VehicleDto vehicle,
+            LocationDto initialLocation
+    ) {
         this.driverLicenseNumber = driverLicenseNumber;
         this.phoneNumber = phoneNumber;
         this.serviceArea = serviceArea;
         this.vehicle = vehicle;
         this.initialLocation = initialLocation;
-    }
-
-    public String getUserId() {
-        return userId;
-    }
-
-    public void setUserId(String userId) {
-        this.userId = userId;
     }
 
     public String getDriverLicenseNumber() {
