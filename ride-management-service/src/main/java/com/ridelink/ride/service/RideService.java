@@ -2,9 +2,14 @@ package com.ridelink.ride.service;
 
 import com.ridelink.ride.client.AccountClient;
 import com.ridelink.ride.client.DriverClient;
+import com.ridelink.ride.client.FareClient;
 import com.ridelink.ride.dto.AccountResponse;
 import com.ridelink.ride.dto.AvailableDriverResponse;
 import com.ridelink.ride.dto.CreateRideRequest;
+import com.ridelink.ride.dto.FareEstimateRequest;
+import com.ridelink.ride.dto.FareEstimateResponse;
+import com.ridelink.ride.dto.FinalFareRequest;
+import com.ridelink.ride.dto.FinalFareResponse;
 import com.ridelink.ride.dto.RideLocationRequest;
 import com.ridelink.ride.dto.RideResponse;
 import com.ridelink.ride.dto.UpdateRideStatusRequest;
@@ -13,6 +18,7 @@ import com.ridelink.ride.entity.RideLocation;
 import com.ridelink.ride.entity.RideStatus;
 import com.ridelink.ride.exception.ApiException;
 import com.ridelink.ride.repository.RideRepository;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -24,21 +30,23 @@ import java.util.Set;
 @Service
 public class RideService {
 
-    private static final double BASE_FARE = 2.50;
-    private static final double RATE_PER_KM = 1.20;
+    private static final double ESTIMATED_AVERAGE_SPEED_KMH = 30.0;
 
     private final RideRepository rideRepository;
     private final DriverClient driverClient;
     private final AccountClient accountClient;
+    private final FareClient fareClient;
 
     public RideService(
             RideRepository rideRepository,
             DriverClient driverClient,
-            AccountClient accountClient) {
+            AccountClient accountClient,
+            FareClient fareClient) {
 
         this.rideRepository = rideRepository;
         this.driverClient = driverClient;
         this.accountClient = accountClient;
+        this.fareClient = fareClient;
     }
 
     public RideResponse createRide(
@@ -75,27 +83,41 @@ public class RideService {
                 toLocation(request.getDestination());
 
         double distanceKm =
-                distanceInKm(
-                        pickup,
-                        destination);
+                roundDistance(
+                        distanceInKm(
+                                pickup,
+                                destination));
 
-        double estimatedFare =
-                round(
-                        BASE_FARE
-                                + (distanceKm * RATE_PER_KM));
+        int durationMinutes =
+                estimateDurationMinutes(
+                        distanceKm);
+
+        FareEstimateRequest fareRequest =
+                new FareEstimateRequest(
+                        pickup.getPlace(),
+                        destination.getPlace(),
+                        distanceKm,
+                        durationMinutes);
+
+        FareEstimateResponse fareResponse =
+                fareClient.estimateFare(
+                        fareRequest);
 
         Ride ride = new Ride(
                 account.getId().trim(),
                 pickup,
                 destination,
                 request.getVehicleType(),
-                estimatedFare);
+                fareResponse
+                        .estimatedFare()
+                        .doubleValue());
 
         return RideResponse.fromEntity(
                 rideRepository.save(ride));
     }
 
     public RideResponse getRide(String id) {
+
         return RideResponse.fromEntity(
                 findRide(id));
     }
@@ -139,6 +161,7 @@ public class RideService {
                 );
 
         if (drivers == null || drivers.isEmpty()) {
+
             throw new ApiException(
                     HttpStatus.CONFLICT,
                     "No available driver matches this ride request");
@@ -155,10 +178,14 @@ public class RideService {
                     "Driver service returned an invalid driver ID");
         }
 
-        driverClient.assignDriver(driverId);
+        driverClient.assignDriver(
+                driverId);
 
-        ride.setDriverId(driverId);
-        ride.setStatus(RideStatus.ASSIGNED);
+        ride.setDriverId(
+                driverId);
+
+        ride.setStatus(
+                RideStatus.ASSIGNED);
 
         touch(ride);
 
@@ -170,7 +197,8 @@ public class RideService {
             String id,
             UpdateRideStatusRequest request) {
 
-        Ride ride = findRide(id);
+        Ride ride =
+                findRide(id);
 
         RideStatus current =
                 ride.getStatus();
@@ -193,7 +221,7 @@ public class RideService {
 
             if (request.getCancellationReason() == null
                     || request.getCancellationReason()
-                    .isBlank()) {
+                            .isBlank()) {
 
                 throw new ApiException(
                         HttpStatus.BAD_REQUEST,
@@ -211,8 +239,7 @@ public class RideService {
 
                 driverClient.releaseDriver(
                         ride.getDriverId(),
-                        false
-                );
+                        false);
             }
 
         } else if (target == RideStatus.ACCEPTED) {
@@ -227,22 +254,37 @@ public class RideService {
 
         } else if (target == RideStatus.COMPLETED) {
 
-            ride.setCompletedAt(
-                    Instant.now());
+            validateCompletionDetails(
+                    request);
+
+            FinalFareRequest finalFareRequest =
+                    new FinalFareRequest(
+                            request.getActualDistanceKm(),
+                            request.getActualDurationMinutes());
+
+            FinalFareResponse finalFareResponse =
+                    fareClient.finalizeFare(
+                            ride.getId(),
+                            finalFareRequest);
 
             ride.setFinalFare(
-                    ride.getEstimatedFare());
+                    finalFareResponse
+                            .totalFare()
+                            .doubleValue());
+
+            ride.setCompletedAt(
+                    Instant.now());
 
             if (ride.getDriverId() != null) {
 
                 driverClient.releaseDriver(
                         ride.getDriverId(),
-                        true
-                );
+                        true);
             }
         }
 
-        ride.setStatus(target);
+        ride.setStatus(
+                target);
 
         touch(ride);
 
@@ -250,20 +292,56 @@ public class RideService {
                 rideRepository.save(ride));
     }
 
-    private Ride findRide(String id) {
+    private void validateCompletionDetails(
+            UpdateRideStatusRequest request) {
 
-        return rideRepository.findById(id)
+        if (request.getActualDistanceKm() == null) {
+
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "Actual distance is required when completing a ride");
+        }
+
+        if (request.getActualDistanceKm() < 0.1) {
+
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "Actual distance must be at least 0.1 km");
+        }
+
+        if (request.getActualDurationMinutes() == null) {
+
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "Actual duration is required when completing a ride");
+        }
+
+        if (request.getActualDurationMinutes() < 1) {
+
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "Actual duration must be at least 1 minute");
+        }
+    }
+
+    private Ride findRide(
+            String id) {
+
+        return rideRepository
+                .findById(id)
                 .orElseThrow(() ->
                         new ApiException(
                                 HttpStatus.NOT_FOUND,
-                                "Ride not found with ID: " + id));
+                                "Ride not found with ID: "
+                                        + id));
     }
 
     private void requireStatus(
             Ride ride,
             RideStatus expected) {
 
-        if (ride.getStatus() != expected) {
+        if (ride.getStatus()
+                != expected) {
 
             throw new ApiException(
                     HttpStatus.CONFLICT,
@@ -313,7 +391,9 @@ public class RideService {
                 request.getLongitude());
     }
 
-    private void touch(Ride ride) {
+    private void touch(
+            Ride ride) {
+
         ride.setUpdatedAt(
                 Instant.now());
     }
@@ -351,8 +431,24 @@ public class RideService {
                 Math.sqrt(1 - a));
     }
 
-    private double round(double value) {
+    private double roundDistance(
+            double distanceKm) {
+
         return Math.round(
-                value * 100.0) / 100.0;
+                distanceKm * 100.0)
+                / 100.0;
+    }
+
+    private int estimateDurationMinutes(
+            double distanceKm) {
+
+        double hours =
+                distanceKm
+                        / ESTIMATED_AVERAGE_SPEED_KMH;
+
+        return Math.max(
+                1,
+                (int) Math.ceil(
+                        hours * 60.0));
     }
 }

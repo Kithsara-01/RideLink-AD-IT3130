@@ -1,5 +1,6 @@
 package com.ridelink.payment.controller;
 
+import com.ridelink.payment.config.InternalServiceAuthenticationFilter;
 import com.ridelink.payment.config.SecurityConfig;
 import com.ridelink.payment.dto.FareEstimateRequest;
 import com.ridelink.payment.dto.FareEstimateResponse;
@@ -31,9 +32,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(FareController.class)
-@Import(SecurityConfig.class)
-@WithMockUser(roles = "ADMIN")
+@Import({
+        SecurityConfig.class,
+        InternalServiceAuthenticationFilter.class
+})
 class FareControllerTest {
+
+    private static final String INTERNAL_KEY =
+            "test-internal-service-key";
 
     @Autowired
     private MockMvc mockMvc;
@@ -48,41 +54,62 @@ class FareControllerTest {
     private JwtDecoder jwtDecoder;
 
     @Test
-    void shouldEstimateFare() throws Exception {
-
-        FareEstimateResponse response =
-                new FareEstimateResponse(
-                        "SLIIT Malabe",
-                        "Kaduwela",
-                        8.5,
-                        25,
-                        new BigDecimal("110.00"),
-                        new BigDecimal("675.00"),
-                        new BigDecimal("125.00"),
-                        new BigDecimal("910.00"),
-                        "LKR"
-                );
+    @WithMockUser(roles = "ADMIN")
+    void shouldEstimateFareWithJwtAuthentication() throws Exception {
 
         when(fareCalculationService.calculateEstimate(
                 any(FareEstimateRequest.class)))
-                .thenReturn(response);
+                .thenReturn(estimateResponse());
 
         mockMvc.perform(post("/api/fares/estimate")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "pickup": "SLIIT Malabe",
-                                  "destination": "Kaduwela",
-                                  "distanceKm": 8.5,
-                                  "durationMinutes": 25
-                                }
-                                """))
+                        .content(estimateRequestJson()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estimatedFare").value(910.00))
                 .andExpect(jsonPath("$.currency").value("LKR"));
     }
 
     @Test
+    void shouldEstimateFareWithCorrectInternalKey() throws Exception {
+
+        when(fareCalculationService.calculateEstimate(
+                any(FareEstimateRequest.class)))
+                .thenReturn(estimateResponse());
+
+        mockMvc.perform(post("/api/fares/estimate")
+                        .header(
+                                "X-Internal-Service-Key",
+                                INTERNAL_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(estimateRequestJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estimatedFare").value(910.00))
+                .andExpect(jsonPath("$.currency").value("LKR"));
+    }
+
+    @Test
+    void shouldRejectEstimateWithoutInternalKey() throws Exception {
+
+        mockMvc.perform(post("/api/fares/estimate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(estimateRequestJson()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectEstimateWithWrongInternalKey() throws Exception {
+
+        mockMvc.perform(post("/api/fares/estimate")
+                        .header(
+                                "X-Internal-Service-Key",
+                                "wrong-internal-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(estimateRequestJson()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReturn400ForInvalidFareEstimate() throws Exception {
 
         mockMvc.perform(post("/api/fares/estimate")
@@ -99,43 +126,64 @@ class FareControllerTest {
     }
 
     @Test
-    void shouldFinalizeFare() throws Exception {
-
-        FinalFareResponse response =
-                new FinalFareResponse(
-                        "RIDE001",
-                        8.5,
-                        25,
-                        new BigDecimal("110.00"),
-                        new BigDecimal("675.00"),
-                        new BigDecimal("125.00"),
-                        new BigDecimal("910.00"),
-                        "LKR",
-                        new BigDecimal("110.00"),
-                        new BigDecimal("90.00"),
-                        new BigDecimal("5.00"),
-                        Instant.parse("2026-09-28T01:30:00Z")
-                );
+    @WithMockUser(roles = "ADMIN")
+    void shouldFinalizeFareWithJwtAuthentication() throws Exception {
 
         when(finalFareService.finalizeFare(
                 eq("RIDE001"),
                 any(FinalFareRequest.class)))
-                .thenReturn(response);
+                .thenReturn(finalFareResponse());
 
         mockMvc.perform(post("/api/fares/rides/RIDE001/finalize")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "actualDistanceKm": 8.5,
-                                  "actualDurationMinutes": 25
-                                }
-                                """))
+                        .content(finalFareRequestJson()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rideId").value("RIDE001"))
                 .andExpect(jsonPath("$.totalFare").value(910.00));
     }
 
     @Test
+    void shouldFinalizeFareWithCorrectInternalKey() throws Exception {
+
+        when(finalFareService.finalizeFare(
+                eq("RIDE001"),
+                any(FinalFareRequest.class)))
+                .thenReturn(finalFareResponse());
+
+        mockMvc.perform(post("/api/fares/rides/RIDE001/finalize")
+                        .header(
+                                "X-Internal-Service-Key",
+                                INTERNAL_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(finalFareRequestJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rideId").value("RIDE001"))
+                .andExpect(jsonPath("$.totalFare").value(910.00));
+    }
+
+    @Test
+    void shouldRejectFinalizeWithoutInternalKey() throws Exception {
+
+        mockMvc.perform(post("/api/fares/rides/RIDE001/finalize")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(finalFareRequestJson()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectFinalizeWithWrongInternalKey() throws Exception {
+
+        mockMvc.perform(post("/api/fares/rides/RIDE001/finalize")
+                        .header(
+                                "X-Internal-Service-Key",
+                                "wrong-internal-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(finalFareRequestJson()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReturn409WhenFinalFareAlreadyExists() throws Exception {
 
         when(finalFareService.finalizeFare(
@@ -147,16 +195,12 @@ class FareControllerTest {
 
         mockMvc.perform(post("/api/fares/rides/RIDE001/finalize")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "actualDistanceKm": 8.5,
-                                  "actualDurationMinutes": 25
-                                }
-                                """))
+                        .content(finalFareRequestJson()))
                 .andExpect(status().isConflict());
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReturn404WhenFinalFareDoesNotExist() throws Exception {
 
         when(finalFareService.getFinalFare("RIDE999"))
@@ -166,5 +210,60 @@ class FareControllerTest {
 
         mockMvc.perform(get("/api/fares/rides/RIDE999"))
                 .andExpect(status().isNotFound());
+    }
+
+    private FareEstimateResponse estimateResponse() {
+
+        return new FareEstimateResponse(
+                "SLIIT Malabe",
+                "Kaduwela",
+                8.5,
+                25,
+                new BigDecimal("110.00"),
+                new BigDecimal("675.00"),
+                new BigDecimal("125.00"),
+                new BigDecimal("910.00"),
+                "LKR"
+        );
+    }
+
+    private FinalFareResponse finalFareResponse() {
+
+        return new FinalFareResponse(
+                "RIDE001",
+                8.5,
+                25,
+                new BigDecimal("110.00"),
+                new BigDecimal("675.00"),
+                new BigDecimal("125.00"),
+                new BigDecimal("910.00"),
+                "LKR",
+                new BigDecimal("110.00"),
+                new BigDecimal("90.00"),
+                new BigDecimal("5.00"),
+                Instant.parse("2026-09-28T01:30:00Z")
+        );
+    }
+
+    private String estimateRequestJson() {
+
+        return """
+                {
+                  "pickup": "SLIIT Malabe",
+                  "destination": "Kaduwela",
+                  "distanceKm": 8.5,
+                  "durationMinutes": 25
+                }
+                """;
+    }
+
+    private String finalFareRequestJson() {
+
+        return """
+                {
+                  "actualDistanceKm": 8.5,
+                  "actualDurationMinutes": 25
+                }
+                """;
     }
 }

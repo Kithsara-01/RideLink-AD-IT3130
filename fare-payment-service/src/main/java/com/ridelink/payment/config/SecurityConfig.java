@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 public class SecurityConfig {
@@ -36,7 +37,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationConverter converter)
+            JwtAuthenticationConverter converter,
+            InternalServiceAuthenticationFilter internalServiceAuthenticationFilter)
             throws Exception {
 
         AuthenticationEntryPoint unauthorized =
@@ -73,22 +75,46 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/fares/estimate")
-                        .hasAnyRole("RIDER", "DRIVER", "ADMIN")
+                        .hasAnyRole(
+                                "RIDER",
+                                "DRIVER",
+                                "ADMIN",
+                                "INTERNAL_RIDE_SERVICE")
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/fares/rides/*/finalize")
+                        .hasAnyRole(
+                                "RIDER",
+                                "DRIVER",
+                                "ADMIN",
+                                "INTERNAL_RIDE_SERVICE")
 
                         .requestMatchers(
                                 "/api/fares/rides/**")
-                        .hasAnyRole("RIDER", "DRIVER", "ADMIN")
+                        .hasAnyRole(
+                                "RIDER",
+                                "DRIVER",
+                                "ADMIN")
 
                         .requestMatchers(
                                 "/api/payments/**")
-                        .hasAnyRole("RIDER", "ADMIN")
+                        .hasAnyRole(
+                                "RIDER",
+                                "ADMIN")
 
                         .requestMatchers(
                                 "/api/receipts/**")
-                        .hasAnyRole("RIDER", "ADMIN")
+                        .hasAnyRole(
+                                "RIDER",
+                                "ADMIN")
 
                         .anyRequest()
                         .denyAll())
+
+                .addFilterBefore(
+                        internalServiceAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class)
 
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt
