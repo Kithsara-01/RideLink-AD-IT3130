@@ -1,5 +1,7 @@
 package com.ridelink.driver.service;
 
+import com.ridelink.driver.client.AccountClient;
+import com.ridelink.driver.dto.AccountResponse;
 import com.ridelink.driver.dto.AvailableDriverResponse;
 import com.ridelink.driver.dto.CreateDriverRequest;
 import com.ridelink.driver.dto.DriverResponse;
@@ -33,192 +35,394 @@ public class DriverService {
     private static final double DEFAULT_SEARCH_RADIUS_KM = 15.0;
 
     private final DriverRepository driverRepository;
+    private final AccountClient accountClient;
 
-    public DriverService(DriverRepository driverRepository) {
+    public DriverService(
+            DriverRepository driverRepository,
+            AccountClient accountClient) {
+
         this.driverRepository = driverRepository;
+        this.accountClient = accountClient;
     }
 
-    public DriverResponse registerDriver(CreateDriverRequest request) {
-        String trimmedUserId = request.getUserId().trim();
-        String normalizedLicenseNumber = request.getDriverLicenseNumber().trim().toUpperCase(Locale.ROOT);
-        String normalizedPlate = request.getVehicle().getLicensePlate().trim().toUpperCase(Locale.ROOT);
+    public DriverResponse registerDriver(
+            CreateDriverRequest request,
+            String bearerToken) {
 
-        if (driverRepository.existsByUserId(trimmedUserId)) {
-            throw new ApiException(HttpStatus.CONFLICT, "Driver profile already exists for user ID: " + trimmedUserId);
+        AccountResponse account =
+                accountClient.getCurrentAccount(bearerToken);
+
+        if (!account.isActive()) {
+            throw new ApiException(
+                    HttpStatus.FORBIDDEN,
+                    "Inactive account cannot create a driver profile"
+            );
         }
 
-        if (driverRepository.existsByDriverLicenseNumber(normalizedLicenseNumber)) {
-            throw new ApiException(HttpStatus.CONFLICT, "Driver license number is already registered");
+        if (account.getRole() == null
+                || !account.getRole().equalsIgnoreCase("DRIVER")) {
+
+            throw new ApiException(
+                    HttpStatus.FORBIDDEN,
+                    "Only DRIVER accounts can create driver profiles"
+            );
         }
 
-        if (driverRepository.existsByVehicleLicensePlate(normalizedPlate)) {
-            throw new ApiException(HttpStatus.CONFLICT, "Vehicle license plate is already registered");
+        if (account.getId() == null || account.getId().isBlank()) {
+            throw new ApiException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Account Service returned an invalid account ID"
+            );
+        }
+
+        String userId = account.getId().trim();
+
+        String normalizedLicenseNumber =
+                request.getDriverLicenseNumber()
+                        .trim()
+                        .toUpperCase(Locale.ROOT);
+
+        String normalizedPlate =
+                request.getVehicle()
+                        .getLicensePlate()
+                        .trim()
+                        .toUpperCase(Locale.ROOT);
+
+        if (driverRepository.existsByUserId(userId)) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "Driver profile already exists for user ID: " + userId
+            );
+        }
+
+        if (driverRepository.existsByDriverLicenseNumber(
+                normalizedLicenseNumber)) {
+
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "Driver license number is already registered"
+            );
+        }
+
+        if (driverRepository.existsByVehicleLicensePlate(
+                normalizedPlate)) {
+
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "Vehicle license plate is already registered"
+            );
         }
 
         VehicleDto vDto = request.getVehicle();
+
         Vehicle vehicle = new Vehicle(
-            vDto.getMake().trim(),
-            vDto.getModel().trim(),
-            vDto.getYear(),
-            normalizedPlate,
-            vDto.getColor().trim(),
-            vDto.getVehicleType(),
-            vDto.getCapacity()
+                vDto.getMake().trim(),
+                vDto.getModel().trim(),
+                vDto.getYear(),
+                normalizedPlate,
+                vDto.getColor().trim(),
+                vDto.getVehicleType(),
+                vDto.getCapacity()
         );
 
         LocationDto lDto = request.getInitialLocation();
+
         Location location = new Location(
-            lDto.getLatitude(),
-            lDto.getLongitude(),
-            lDto.getAddressOrPlace() != null ? lDto.getAddressOrPlace().trim() : "Initial Location",
-            Instant.now()
+                lDto.getLatitude(),
+                lDto.getLongitude(),
+                lDto.getAddressOrPlace() != null
+                        ? lDto.getAddressOrPlace().trim()
+                        : "Initial Location",
+                Instant.now()
         );
 
         Driver driver = new Driver(
-            trimmedUserId,
-            normalizedLicenseNumber,
-            request.getPhoneNumber().trim(),
-            request.getServiceArea().trim(),
-            vehicle,
-            location
+                userId,
+                normalizedLicenseNumber,
+                request.getPhoneNumber().trim(),
+                request.getServiceArea().trim(),
+                vehicle,
+                location
         );
 
         Driver saved = driverRepository.save(driver);
+
         return DriverResponse.fromEntity(saved);
     }
 
     public DriverResponse getDriverById(String id) {
+
         Driver driver = driverRepository.findById(id)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Driver not found with ID: " + id));
+                .orElseThrow(() ->
+                        new ApiException(
+                                HttpStatus.NOT_FOUND,
+                                "Driver not found with ID: " + id
+                        )
+                );
+
         return DriverResponse.fromEntity(driver);
     }
 
     public DriverResponse getDriverByUserId(String userId) {
-        Driver driver = driverRepository.findByUserId(userId.trim())
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Driver not found for user ID: " + userId));
+
+        Driver driver =
+                driverRepository.findByUserId(userId.trim())
+                        .orElseThrow(() ->
+                                new ApiException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Driver not found for user ID: "
+                                                + userId
+                                )
+                        );
+
         return DriverResponse.fromEntity(driver);
     }
 
-    public DriverResponse updateVehicle(String id, UpdateVehicleRequest request) {
+    public DriverResponse updateVehicle(
+            String id,
+            UpdateVehicleRequest request) {
+
         Driver driver = driverRepository.findById(id)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Driver not found with ID: " + id));
+                .orElseThrow(() ->
+                        new ApiException(
+                                HttpStatus.NOT_FOUND,
+                                "Driver not found with ID: " + id
+                        )
+                );
 
-        String normalizedPlate = request.getLicensePlate().trim().toUpperCase(Locale.ROOT);
+        String normalizedPlate =
+                request.getLicensePlate()
+                        .trim()
+                        .toUpperCase(Locale.ROOT);
 
-        driverRepository.findByVehicleLicensePlate(normalizedPlate).ifPresent(existing -> {
-            if (!existing.getId().equals(driver.getId())) {
-                throw new ApiException(HttpStatus.CONFLICT, "Vehicle license plate is already registered to another driver");
-            }
-        });
+        driverRepository.findByVehicleLicensePlate(normalizedPlate)
+                .ifPresent(existing -> {
+
+                    if (!existing.getId().equals(driver.getId())) {
+
+                        throw new ApiException(
+                                HttpStatus.CONFLICT,
+                                "Vehicle license plate is already registered to another driver"
+                        );
+                    }
+                });
 
         Vehicle vehicle = new Vehicle(
-            request.getMake().trim(),
-            request.getModel().trim(),
-            request.getYear(),
-            normalizedPlate,
-            request.getColor().trim(),
-            request.getVehicleType(),
-            request.getCapacity()
+                request.getMake().trim(),
+                request.getModel().trim(),
+                request.getYear(),
+                normalizedPlate,
+                request.getColor().trim(),
+                request.getVehicleType(),
+                request.getCapacity()
         );
 
         driver.setVehicle(vehicle);
         driver.setUpdatedAt(Instant.now());
 
         Driver updated = driverRepository.save(driver);
+
         return DriverResponse.fromEntity(updated);
     }
 
-    public DriverResponse updateAvailability(String id, UpdateAvailabilityRequest request) {
+    public DriverResponse updateAvailability(
+            String id,
+            UpdateAvailabilityRequest request) {
+
         Driver driver = driverRepository.findById(id)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Driver not found with ID: " + id));
+                .orElseThrow(() ->
+                        new ApiException(
+                                HttpStatus.NOT_FOUND,
+                                "Driver not found with ID: " + id
+                        )
+                );
 
         AvailabilityStatus targetStatus = request.getStatus();
 
-        if (driver.getOperationalStatus() == OperationalStatus.SUSPENDED && targetStatus == AvailabilityStatus.AVAILABLE) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Suspended driver cannot set availability status to AVAILABLE");
+        if (driver.getOperationalStatus()
+                == OperationalStatus.SUSPENDED
+                && targetStatus == AvailabilityStatus.AVAILABLE) {
+
+            throw new ApiException(
+                    HttpStatus.FORBIDDEN,
+                    "Suspended driver cannot set availability status to AVAILABLE"
+            );
         }
 
-        if (driver.getAvailabilityStatus() == AvailabilityStatus.BUSY && targetStatus == AvailabilityStatus.OFFLINE) {
-            throw new ApiException(HttpStatus.CONFLICT, "Cannot go OFFLINE while engaged in an active ride");
+        if (driver.getAvailabilityStatus()
+                == AvailabilityStatus.BUSY
+                && targetStatus == AvailabilityStatus.OFFLINE) {
+
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "Cannot go OFFLINE while engaged in an active ride"
+            );
         }
 
         driver.setAvailabilityStatus(targetStatus);
         driver.setUpdatedAt(Instant.now());
 
         Driver updated = driverRepository.save(driver);
+
         return DriverResponse.fromEntity(updated);
     }
 
-    public DriverResponse updateLocation(String id, UpdateLocationRequest request) {
+    public DriverResponse updateLocation(
+            String id,
+            UpdateLocationRequest request) {
+
         Driver driver = driverRepository.findById(id)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Driver not found with ID: " + id));
+                .orElseThrow(() ->
+                        new ApiException(
+                                HttpStatus.NOT_FOUND,
+                                "Driver not found with ID: " + id
+                        )
+                );
 
         Location location = driver.getCurrentLocation();
+
         if (location == null) {
             location = new Location();
         }
 
         location.setLatitude(request.getLatitude());
         location.setLongitude(request.getLongitude());
-        if (request.getAddressOrPlace() != null && !request.getAddressOrPlace().isBlank()) {
-            location.setAddressOrPlace(request.getAddressOrPlace().trim());
+
+        if (request.getAddressOrPlace() != null
+                && !request.getAddressOrPlace().isBlank()) {
+
+            location.setAddressOrPlace(
+                    request.getAddressOrPlace().trim()
+            );
         }
+
         location.setLastUpdated(Instant.now());
+
         driver.setCurrentLocation(location);
 
-        if (request.getServiceArea() != null && !request.getServiceArea().isBlank()) {
-            driver.setServiceArea(request.getServiceArea().trim());
+        if (request.getServiceArea() != null
+                && !request.getServiceArea().isBlank()) {
+
+            driver.setServiceArea(
+                    request.getServiceArea().trim()
+            );
         }
 
         driver.setUpdatedAt(Instant.now());
 
         Driver updated = driverRepository.save(driver);
+
         return DriverResponse.fromEntity(updated);
     }
 
     public DriverResponse assignDriver(String id) {
+
         Driver driver = driverRepository.findById(id)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Driver not found with ID: " + id));
+                .orElseThrow(() ->
+                        new ApiException(
+                                HttpStatus.NOT_FOUND,
+                                "Driver not found with ID: " + id
+                        )
+                );
 
-        if (driver.getOperationalStatus() == OperationalStatus.SUSPENDED) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Suspended driver cannot be assigned to rides");
+        if (driver.getOperationalStatus()
+                == OperationalStatus.SUSPENDED) {
+
+            throw new ApiException(
+                    HttpStatus.FORBIDDEN,
+                    "Suspended driver cannot be assigned to rides"
+            );
         }
 
-        if (driver.getAvailabilityStatus() != AvailabilityStatus.AVAILABLE) {
-            throw new ApiException(HttpStatus.CONFLICT, "Driver is not available for assignment. Current status: " + driver.getAvailabilityStatus());
+        if (driver.getAvailabilityStatus()
+                != AvailabilityStatus.AVAILABLE) {
+
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "Driver is not available for assignment. Current status: "
+                            + driver.getAvailabilityStatus()
+            );
         }
 
-        driver.setAvailabilityStatus(AvailabilityStatus.BUSY);
+        driver.setAvailabilityStatus(
+                AvailabilityStatus.BUSY
+        );
+
         driver.setUpdatedAt(Instant.now());
 
         Driver updated = driverRepository.save(driver);
+
         return DriverResponse.fromEntity(updated);
     }
 
     public DriverResponse releaseDriver(String id) {
-        Driver driver = driverRepository.findById(id)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Driver not found with ID: " + id));
 
-        driver.setAvailabilityStatus(AvailabilityStatus.AVAILABLE);
-        int completed = driver.getTotalRidesCompleted() == null ? 0 : driver.getTotalRidesCompleted();
-        driver.setTotalRidesCompleted(completed + 1);
+        return releaseDriver(id, true);
+    }
+
+    public DriverResponse releaseDriver(
+            String id,
+            boolean completedRide) {
+
+        Driver driver = driverRepository.findById(id)
+                .orElseThrow(() ->
+                        new ApiException(
+                                HttpStatus.NOT_FOUND,
+                                "Driver not found with ID: " + id
+                        )
+                );
+
+        driver.setAvailabilityStatus(
+                AvailabilityStatus.AVAILABLE
+        );
+
+        if (completedRide) {
+
+            int completed =
+                    driver.getTotalRidesCompleted() == null
+                            ? 0
+                            : driver.getTotalRidesCompleted();
+
+            driver.setTotalRidesCompleted(
+                    completed + 1
+            );
+        }
+
         driver.setUpdatedAt(Instant.now());
 
         Driver updated = driverRepository.save(driver);
+
         return DriverResponse.fromEntity(updated);
     }
 
-    public DriverResponse updateOperationalStatus(String id, UpdateOperationalStatusRequest request) {
-        Driver driver = driverRepository.findById(id)
-            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Driver not found with ID: " + id));
+    public DriverResponse updateOperationalStatus(
+            String id,
+            UpdateOperationalStatusRequest request) {
 
-        driver.setOperationalStatus(request.getStatus());
-        if (request.getStatus() == OperationalStatus.SUSPENDED) {
-            driver.setAvailabilityStatus(AvailabilityStatus.OFFLINE);
+        Driver driver = driverRepository.findById(id)
+                .orElseThrow(() ->
+                        new ApiException(
+                                HttpStatus.NOT_FOUND,
+                                "Driver not found with ID: " + id
+                        )
+                );
+
+        driver.setOperationalStatus(
+                request.getStatus()
+        );
+
+        if (request.getStatus()
+                == OperationalStatus.SUSPENDED) {
+
+            driver.setAvailabilityStatus(
+                    AvailabilityStatus.OFFLINE
+            );
         }
+
         driver.setUpdatedAt(Instant.now());
 
         Driver updated = driverRepository.save(driver);
+
         return DriverResponse.fromEntity(updated);
     }
 
@@ -229,58 +433,137 @@ public class DriverService {
             Double pickupLng,
             Double radiusKm) {
 
-        List<Driver> activeAvailableDrivers = driverRepository.findByOperationalStatusAndAvailabilityStatus(
-            OperationalStatus.ACTIVE,
-            AvailabilityStatus.AVAILABLE
-        );
+        List<Driver> activeAvailableDrivers =
+                driverRepository
+                        .findByOperationalStatusAndAvailabilityStatus(
+                                OperationalStatus.ACTIVE,
+                                AvailabilityStatus.AVAILABLE
+                        );
 
-        double maxRadius = (radiusKm != null && radiusKm > 0) ? radiusKm : DEFAULT_SEARCH_RADIUS_KM;
+        double maxRadius =
+                (radiusKm != null && radiusKm > 0)
+                        ? radiusKm
+                        : DEFAULT_SEARCH_RADIUS_KM;
 
         return activeAvailableDrivers.stream()
-            .filter(driver -> {
-                if (serviceArea != null && !serviceArea.isBlank()) {
-                    return driver.getServiceArea() != null &&
-                           driver.getServiceArea().equalsIgnoreCase(serviceArea.trim());
-                }
-                return true;
-            })
-            .filter(driver -> {
-                if (vehicleType != null) {
-                    return driver.getVehicle() != null &&
-                           driver.getVehicle().getVehicleType() == vehicleType;
-                }
-                return true;
-            })
-            .map(driver -> {
-                Double distance = null;
-                if (pickupLat != null && pickupLng != null && driver.getCurrentLocation() != null) {
-                    Double dLat = driver.getCurrentLocation().getLatitude();
-                    Double dLng = driver.getCurrentLocation().getLongitude();
-                    if (dLat != null && dLng != null) {
-                        distance = calculateDistanceKm(pickupLat, pickupLng, dLat, dLng);
+
+                .filter(driver -> {
+
+                    if (serviceArea != null
+                            && !serviceArea.isBlank()) {
+
+                        return driver.getServiceArea() != null
+                                && driver.getServiceArea()
+                                .equalsIgnoreCase(
+                                        serviceArea.trim()
+                                );
                     }
-                }
-                return AvailableDriverResponse.fromEntity(driver, distance);
-            })
-            .filter(response -> {
-                if (pickupLat != null && pickupLng != null) {
-                    return response.getDistanceKm() != null && response.getDistanceKm() <= maxRadius;
-                }
-                return true;
-            })
-            .sorted(Comparator.comparing(AvailableDriverResponse::getDistanceKm, Comparator.nullsLast(Double::compareTo)))
-            .collect(Collectors.toList());
+
+                    return true;
+                })
+
+                .filter(driver -> {
+
+                    if (vehicleType != null) {
+
+                        return driver.getVehicle() != null
+                                && driver.getVehicle()
+                                .getVehicleType()
+                                == vehicleType;
+                    }
+
+                    return true;
+                })
+
+                .map(driver -> {
+
+                    Double distance = null;
+
+                    if (pickupLat != null
+                            && pickupLng != null
+                            && driver.getCurrentLocation()
+                            != null) {
+
+                        Double dLat =
+                                driver.getCurrentLocation()
+                                        .getLatitude();
+
+                        Double dLng =
+                                driver.getCurrentLocation()
+                                        .getLongitude();
+
+                        if (dLat != null && dLng != null) {
+
+                            distance =
+                                    calculateDistanceKm(
+                                            pickupLat,
+                                            pickupLng,
+                                            dLat,
+                                            dLng
+                                    );
+                        }
+                    }
+
+                    return AvailableDriverResponse
+                            .fromEntity(
+                                    driver,
+                                    distance
+                            );
+                })
+
+                .filter(response -> {
+
+                    if (pickupLat != null
+                            && pickupLng != null) {
+
+                        return response.getDistanceKm()
+                                != null
+                                && response.getDistanceKm()
+                                <= maxRadius;
+                    }
+
+                    return true;
+                })
+
+                .sorted(
+                        Comparator.comparing(
+                                AvailableDriverResponse
+                                        ::getDistanceKm,
+                                Comparator.nullsLast(
+                                        Double::compareTo
+                                )
+                        )
+                )
+
+                .collect(Collectors.toList());
     }
 
-    public double calculateDistanceKm(double lat1, double lon1, double lat2, double lon2) {
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
+    public double calculateDistanceKm(
+            double lat1,
+            double lon1,
+            double lat2,
+            double lon2) {
 
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                 * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double dLat =
+                Math.toRadians(lat2 - lat1);
 
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double dLon =
+                Math.toRadians(lon2 - lon1);
+
+        double a =
+                Math.sin(dLat / 2)
+                        * Math.sin(dLat / 2)
+                        + Math.cos(Math.toRadians(lat1))
+                        * Math.cos(Math.toRadians(lat2))
+                        * Math.sin(dLon / 2)
+                        * Math.sin(dLon / 2);
+
+        double c =
+                2 * Math.atan2(
+                        Math.sqrt(a),
+                        Math.sqrt(1 - a)
+                );
+
         return EARTH_RADIUS_KM * c;
     }
 }

@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,13 +36,20 @@ public class RideController {
     }
 
     @PostMapping
-    @Operation(summary = "Create ride request", description = "Creates a requested ride and calculates a transparent distance-based fare estimate")
+    @Operation(
+        summary = "Create ride request",
+        description = "Creates a requested ride and calculates a transparent distance-based fare estimate"
+    )
     @ApiResponses({
         @ApiResponse(responseCode = "201", description = "Ride created"),
         @ApiResponse(responseCode = "400", description = "Invalid ride details")
     })
-    public ResponseEntity<RideResponse> createRide(@Valid @RequestBody CreateRideRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(rideService.createRide(request));
+    public ResponseEntity<RideResponse> createRide(
+            @Valid @RequestBody CreateRideRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(rideService.createRide(request, jwt.getTokenValue()));
     }
 
     @GetMapping("/{id}")
@@ -52,19 +61,25 @@ public class RideController {
     @GetMapping
     @Operation(summary = "List rides", description = "Lists rides for a passenger or driver")
     public ResponseEntity<List<RideResponse>> listRides(
-        @RequestParam(required = false) String passengerId,
-        @RequestParam(required = false) String driverId) {
+            @RequestParam(required = false) String passengerId,
+            @RequestParam(required = false) String driverId) {
+
         if (passengerId != null && !passengerId.isBlank()) {
             return ResponseEntity.ok(rideService.getPassengerRides(passengerId));
         }
+
         if (driverId != null && !driverId.isBlank()) {
             return ResponseEntity.ok(rideService.getDriverRides(driverId));
         }
+
         return ResponseEntity.badRequest().build();
     }
 
     @PostMapping("/{id}/assign")
-    @Operation(summary = "Assign nearest eligible driver", description = "Synchronously queries Driver & Vehicle Service and locks the selected driver")
+    @Operation(
+        summary = "Assign nearest eligible driver",
+        description = "Synchronously queries Driver & Vehicle Service and locks the selected driver"
+    )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Driver assigned"),
         @ApiResponse(responseCode = "409", description = "No driver available or ride is not requestable"),
@@ -75,14 +90,18 @@ public class RideController {
     }
 
     @PatchMapping("/{id}/status")
-    @Operation(summary = "Update ride lifecycle status", description = "Applies valid lifecycle transitions: assigned, accepted, in-progress, completed, or cancelled")
+    @Operation(
+        summary = "Update ride lifecycle status",
+        description = "Applies valid lifecycle transitions: assigned, accepted, in-progress, completed, or cancelled"
+    )
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Ride status updated"),
         @ApiResponse(responseCode = "409", description = "Invalid status transition")
     })
     public ResponseEntity<RideResponse> updateStatus(
-        @PathVariable String id,
-        @Valid @RequestBody UpdateRideStatusRequest request) {
+            @PathVariable String id,
+            @Valid @RequestBody UpdateRideStatusRequest request) {
+
         return ResponseEntity.ok(rideService.updateStatus(id, request));
     }
 }
