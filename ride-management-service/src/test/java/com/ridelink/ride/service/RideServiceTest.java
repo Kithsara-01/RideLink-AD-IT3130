@@ -10,12 +10,17 @@ import com.ridelink.ride.dto.UpdateRideStatusRequest;
 import com.ridelink.ride.entity.Ride;
 import com.ridelink.ride.entity.RideLocation;
 import com.ridelink.ride.entity.RideStatus;
+import com.ridelink.ride.exception.ApiException;
 import com.ridelink.ride.repository.RideRepository;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -45,17 +50,23 @@ class RideServiceTest {
 
     @Test
     void activeRiderCanCreateRide() {
+
         CreateRideRequest request = request();
 
-        AccountResponse account = riderAccount("account-rider-1");
+        AccountResponse account =
+                riderAccount("account-rider-1");
 
         when(accountClient.getCurrentAccount("valid-token"))
                 .thenReturn(account);
 
         when(rideRepository.save(any(Ride.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(invocation ->
+                        invocation.getArgument(0));
 
-        var response = rideService.createRide(request, "valid-token");
+        var response =
+                rideService.createRide(
+                        request,
+                        "valid-token");
 
         assertThat(response.getStatus())
                 .isEqualTo(RideStatus.REQUESTED);
@@ -66,17 +77,23 @@ class RideServiceTest {
 
     @Test
     void createRideUsesAccountServiceIdAsPassengerId() {
+
         CreateRideRequest request = request();
 
-        AccountResponse account = riderAccount("account-rider-123");
+        AccountResponse account =
+                riderAccount("account-rider-123");
 
         when(accountClient.getCurrentAccount("valid-token"))
                 .thenReturn(account);
 
         when(rideRepository.save(any(Ride.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+                .thenAnswer(invocation ->
+                        invocation.getArgument(0));
 
-        var response = rideService.createRide(request, "valid-token");
+        var response =
+                rideService.createRide(
+                        request,
+                        "valid-token");
 
         assertThat(response.getPassengerId())
                 .isEqualTo("account-rider-123");
@@ -87,9 +104,12 @@ class RideServiceTest {
 
     @Test
     void driverAccountCannotCreateRide() {
+
         CreateRideRequest request = request();
 
-        AccountResponse account = new AccountResponse();
+        AccountResponse account =
+                new AccountResponse();
+
         account.setId("driver-account-1");
         account.setRole("DRIVER");
         account.setActive(true);
@@ -98,9 +118,12 @@ class RideServiceTest {
                 .thenReturn(account);
 
         assertThatThrownBy(() ->
-                rideService.createRide(request, "driver-token"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Only RIDER accounts can create rides");
+                rideService.createRide(
+                        request,
+                        "driver-token"))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining(
+                        "Only RIDER accounts can create rides");
 
         verify(rideRepository, never())
                 .save(any(Ride.class));
@@ -108,9 +131,12 @@ class RideServiceTest {
 
     @Test
     void inactiveAccountCannotCreateRide() {
+
         CreateRideRequest request = request();
 
-        AccountResponse account = new AccountResponse();
+        AccountResponse account =
+                new AccountResponse();
+
         account.setId("account-rider-1");
         account.setRole("RIDER");
         account.setActive(false);
@@ -119,9 +145,12 @@ class RideServiceTest {
                 .thenReturn(account);
 
         assertThatThrownBy(() ->
-                rideService.createRide(request, "inactive-token"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Inactive account cannot create a ride");
+                rideService.createRide(
+                        request,
+                        "inactive-token"))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining(
+                        "Inactive account cannot create a ride");
 
         verify(rideRepository, never())
                 .save(any(Ride.class));
@@ -129,9 +158,12 @@ class RideServiceTest {
 
     @Test
     void missingAccountIdIsRejected() {
+
         CreateRideRequest request = request();
 
-        AccountResponse account = new AccountResponse();
+        AccountResponse account =
+                new AccountResponse();
+
         account.setRole("RIDER");
         account.setActive(true);
         account.setId(null);
@@ -140,65 +172,293 @@ class RideServiceTest {
                 .thenReturn(account);
 
         assertThatThrownBy(() ->
-                rideService.createRide(request, "valid-token"))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("invalid account ID");
+                rideService.createRide(
+                        request,
+                        "valid-token"))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining(
+                        "invalid account ID");
 
         verify(rideRepository, never())
                 .save(any(Ride.class));
     }
 
     @Test
-    void assignRideSelectsDriverAndMovesRideToAssigned() {
-        Ride ride = new Ride(
-                "passenger-1",
-                new RideLocation("Colombo", 6.9271, 79.8612),
-                new RideLocation("Kandy", 7.2906, 80.6337),
-                null,
-                10.0
-        );
+    void assignRideSelectsFirstAvailableDriverAndMovesRideToAssigned() {
 
-        ride.setId("ride-1");
+        Ride ride = requestedRide();
 
-        AvailableDriverResponse driver = new AvailableDriverResponse();
-        driver.setId("driver-1");
+        AvailableDriverResponse nearestDriver =
+                new AvailableDriverResponse();
+
+        nearestDriver.setId("driver-nearest");
+        nearestDriver.setDistanceKm(1.0);
+
+        AvailableDriverResponse fartherDriver =
+                new AvailableDriverResponse();
+
+        fartherDriver.setId("driver-farther");
+        fartherDriver.setDistanceKm(5.0);
 
         when(rideRepository.findById("ride-1"))
                 .thenReturn(Optional.of(ride));
 
-        when(driverClient.findAvailableDrivers(any(), any(), any(), any()))
-                .thenReturn(List.of(driver));
+        when(
+                driverClient.findAvailableDrivers(
+                        any(),
+                        any(),
+                        any(),
+                        any())
+        ).thenReturn(
+                List.of(
+                        nearestDriver,
+                        fartherDriver)
+        );
+
+        doNothing()
+                .when(driverClient)
+                .assignDriver("driver-nearest");
 
         when(rideRepository.save(ride))
                 .thenReturn(ride);
 
-        doNothing()
-                .when(driverClient)
-                .assignDriver("driver-1");
-
-        var response = rideService.assignRide("ride-1");
+        var response =
+                rideService.assignRide("ride-1");
 
         assertThat(response.getStatus())
                 .isEqualTo(RideStatus.ASSIGNED);
 
         assertThat(response.getDriverId())
-                .isEqualTo("driver-1");
+                .isEqualTo("driver-nearest");
 
         verify(driverClient)
-                .assignDriver("driver-1");
+                .assignDriver("driver-nearest");
+
+        verify(driverClient, never())
+                .assignDriver("driver-farther");
+    }
+
+    @Test
+    void assignRideReturnsConflictWhenNoDriverAvailable() {
+
+        Ride ride = requestedRide();
+
+        when(rideRepository.findById("ride-1"))
+                .thenReturn(Optional.of(ride));
+
+        when(
+                driverClient.findAvailableDrivers(
+                        any(),
+                        any(),
+                        any(),
+                        any())
+        ).thenReturn(List.of());
+
+        assertThatThrownBy(() ->
+                rideService.assignRide("ride-1"))
+                .isInstanceOf(ApiException.class)
+                .satisfies(exception -> {
+
+                    ApiException apiException =
+                            (ApiException) exception;
+
+                    assertThat(apiException.getStatus())
+                            .isEqualTo(HttpStatus.CONFLICT);
+                })
+                .hasMessageContaining(
+                        "No available driver");
+
+        assertThat(ride.getStatus())
+                .isEqualTo(RideStatus.REQUESTED);
+
+        assertThat(ride.getDriverId())
+                .isNull();
+
+        verify(driverClient, never())
+                .assignDriver(any());
+
+        verify(rideRepository, never())
+                .save(any(Ride.class));
+    }
+
+    @Test
+    void assignRideRejectsInvalidDriverId() {
+
+        Ride ride = requestedRide();
+
+        AvailableDriverResponse invalidDriver =
+                new AvailableDriverResponse();
+
+        invalidDriver.setId(" ");
+
+        when(rideRepository.findById("ride-1"))
+                .thenReturn(Optional.of(ride));
+
+        when(
+                driverClient.findAvailableDrivers(
+                        any(),
+                        any(),
+                        any(),
+                        any())
+        ).thenReturn(
+                List.of(invalidDriver)
+        );
+
+        assertThatThrownBy(() ->
+                rideService.assignRide("ride-1"))
+                .isInstanceOf(ApiException.class)
+                .satisfies(exception -> {
+
+                    ApiException apiException =
+                            (ApiException) exception;
+
+                    assertThat(apiException.getStatus())
+                            .isEqualTo(
+                                    HttpStatus.SERVICE_UNAVAILABLE);
+                })
+                .hasMessageContaining(
+                        "invalid driver ID");
+
+        assertThat(ride.getStatus())
+                .isEqualTo(RideStatus.REQUESTED);
+
+        verify(driverClient, never())
+                .assignDriver(any());
+
+        verify(rideRepository, never())
+                .save(any(Ride.class));
+    }
+
+    @Test
+    void driverServiceUnavailableDoesNotAssignRide() {
+
+        Ride ride = requestedRide();
+
+        when(rideRepository.findById("ride-1"))
+                .thenReturn(Optional.of(ride));
+
+        when(
+                driverClient.findAvailableDrivers(
+                        any(),
+                        any(),
+                        any(),
+                        any())
+        ).thenThrow(
+                new ApiException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Driver service is unavailable")
+        );
+
+        assertThatThrownBy(() ->
+                rideService.assignRide("ride-1"))
+                .isInstanceOf(ApiException.class)
+                .satisfies(exception -> {
+
+                    ApiException apiException =
+                            (ApiException) exception;
+
+                    assertThat(apiException.getStatus())
+                            .isEqualTo(
+                                    HttpStatus.SERVICE_UNAVAILABLE);
+                });
+
+        assertThat(ride.getStatus())
+                .isEqualTo(RideStatus.REQUESTED);
+
+        assertThat(ride.getDriverId())
+                .isNull();
+
+        verify(rideRepository, never())
+                .save(any(Ride.class));
+    }
+
+    @Test
+    void completedRideReleasesDriverAndCountsRide() {
+
+        Ride ride = requestedRide();
+
+        ride.setStatus(RideStatus.IN_PROGRESS);
+        ride.setDriverId("driver-1");
+
+        when(rideRepository.findById("ride-1"))
+                .thenReturn(Optional.of(ride));
+
+        doNothing()
+                .when(driverClient)
+                .releaseDriver(
+                        "driver-1",
+                        true);
+
+        when(rideRepository.save(ride))
+                .thenReturn(ride);
+
+        UpdateRideStatusRequest request =
+                new UpdateRideStatusRequest();
+
+        request.setStatus(
+                RideStatus.COMPLETED);
+
+        var response =
+                rideService.updateStatus(
+                        "ride-1",
+                        request);
+
+        assertThat(response.getStatus())
+                .isEqualTo(RideStatus.COMPLETED);
+
+        verify(driverClient)
+                .releaseDriver(
+                        "driver-1",
+                        true);
+    }
+
+    @Test
+    void cancelledRideReleasesDriverWithoutCountingRide() {
+
+        Ride ride = requestedRide();
+
+        ride.setStatus(RideStatus.ASSIGNED);
+        ride.setDriverId("driver-1");
+
+        when(rideRepository.findById("ride-1"))
+                .thenReturn(Optional.of(ride));
+
+        doNothing()
+                .when(driverClient)
+                .releaseDriver(
+                        "driver-1",
+                        false);
+
+        when(rideRepository.save(ride))
+                .thenReturn(ride);
+
+        UpdateRideStatusRequest request =
+                new UpdateRideStatusRequest();
+
+        request.setStatus(
+                RideStatus.CANCELLED);
+
+        request.setCancellationReason(
+                "Passenger changed plans");
+
+        var response =
+                rideService.updateStatus(
+                        "ride-1",
+                        request);
+
+        assertThat(response.getStatus())
+                .isEqualTo(RideStatus.CANCELLED);
+
+        verify(driverClient)
+                .releaseDriver(
+                        "driver-1",
+                        false);
     }
 
     @Test
     void invalidTransitionIsRejected() {
-        Ride ride = new Ride(
-                "passenger-1",
-                null,
-                null,
-                null,
-                10.0
-        );
 
-        ride.setId("ride-1");
+        Ride ride = requestedRide();
 
         when(rideRepository.findById("ride-1"))
                 .thenReturn(Optional.of(ride));
@@ -206,25 +466,33 @@ class RideServiceTest {
         UpdateRideStatusRequest request =
                 new UpdateRideStatusRequest();
 
-        request.setStatus(RideStatus.COMPLETED);
+        request.setStatus(
+                RideStatus.COMPLETED);
 
         assertThatThrownBy(() ->
-                rideService.updateStatus("ride-1", request))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Invalid ride status transition");
+                rideService.updateStatus(
+                        "ride-1",
+                        request))
+                .isInstanceOf(ApiException.class)
+                .satisfies(exception -> {
+
+                    ApiException apiException =
+                            (ApiException) exception;
+
+                    assertThat(apiException.getStatus())
+                            .isEqualTo(HttpStatus.CONFLICT);
+                })
+                .hasMessageContaining(
+                        "Invalid ride status transition");
+
+        verify(rideRepository, never())
+                .save(any(Ride.class));
     }
 
     @Test
     void cancellationRequiresReason() {
-        Ride ride = new Ride(
-                "passenger-1",
-                null,
-                null,
-                null,
-                10.0
-        );
 
-        ride.setId("ride-1");
+        Ride ride = requestedRide();
 
         when(rideRepository.findById("ride-1"))
                 .thenReturn(Optional.of(ride));
@@ -232,28 +500,75 @@ class RideServiceTest {
         UpdateRideStatusRequest request =
                 new UpdateRideStatusRequest();
 
-        request.setStatus(RideStatus.CANCELLED);
+        request.setStatus(
+                RideStatus.CANCELLED);
 
         assertThatThrownBy(() ->
-                rideService.updateStatus("ride-1", request))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Cancellation reason is required");
+                rideService.updateStatus(
+                        "ride-1",
+                        request))
+                .isInstanceOf(ApiException.class)
+                .satisfies(exception -> {
+
+                    ApiException apiException =
+                            (ApiException) exception;
+
+                    assertThat(apiException.getStatus())
+                            .isEqualTo(HttpStatus.BAD_REQUEST);
+                })
+                .hasMessageContaining(
+                        "Cancellation reason is required");
+
+        verify(rideRepository, never())
+                .save(any(Ride.class));
+    }
+
+    private Ride requestedRide() {
+
+        Ride ride = new Ride(
+                "passenger-1",
+                new RideLocation(
+                        "Colombo",
+                        6.9271,
+                        79.8612),
+                new RideLocation(
+                        "Kandy",
+                        7.2906,
+                        80.6337),
+                null,
+                10.0
+        );
+
+        ride.setId("ride-1");
+
+        return ride;
     }
 
     private CreateRideRequest request() {
-        CreateRideRequest request = new CreateRideRequest();
+
+        CreateRideRequest request =
+                new CreateRideRequest();
 
         request.setPickup(
-                location("Colombo", 6.9271, 79.8612));
+                location(
+                        "Colombo",
+                        6.9271,
+                        79.8612));
 
         request.setDestination(
-                location("Kandy", 7.2906, 80.6337));
+                location(
+                        "Kandy",
+                        7.2906,
+                        80.6337));
 
         return request;
     }
 
-    private AccountResponse riderAccount(String id) {
-        AccountResponse account = new AccountResponse();
+    private AccountResponse riderAccount(
+            String id) {
+
+        AccountResponse account =
+                new AccountResponse();
 
         account.setId(id);
         account.setRole("RIDER");

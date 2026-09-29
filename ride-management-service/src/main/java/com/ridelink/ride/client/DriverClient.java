@@ -76,8 +76,29 @@ public class DriverClient {
         callDriverAction(driverId, "assign");
     }
 
-    public void releaseDriver(String driverId) {
-        callDriverAction(driverId, "release");
+    public void releaseDriver(
+            String driverId,
+            boolean completedRide) {
+
+        try {
+            restClient.patch()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/api/drivers/{id}/release")
+                            .queryParam(
+                                    "completed",
+                                    completedRide)
+                            .build(driverId))
+                    .header(
+                            INTERNAL_KEY_HEADER,
+                            internalServiceKey)
+                    .retrieve()
+                    .toBodilessEntity();
+
+        } catch (RestClientException exception) {
+            throw new ApiException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Driver service could not release driver");
+        }
     }
 
     private void callDriverAction(

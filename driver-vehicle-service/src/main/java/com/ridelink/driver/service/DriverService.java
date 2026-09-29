@@ -40,6 +40,7 @@ public class DriverService {
     public DriverService(
             DriverRepository driverRepository,
             AccountClient accountClient) {
+
         this.driverRepository = driverRepository;
         this.accountClient = accountClient;
     }
@@ -48,7 +49,8 @@ public class DriverService {
             CreateDriverRequest request,
             String bearerToken) {
 
-        AccountResponse account = accountClient.getCurrentAccount(bearerToken);
+        AccountResponse account =
+                accountClient.getCurrentAccount(bearerToken);
 
         if (!account.isActive()) {
             throw new ApiException(
@@ -57,8 +59,9 @@ public class DriverService {
             );
         }
 
-        if (account.getRole() == null ||
-                !account.getRole().equalsIgnoreCase("DRIVER")) {
+        if (account.getRole() == null
+                || !account.getRole().equalsIgnoreCase("DRIVER")) {
+
             throw new ApiException(
                     HttpStatus.FORBIDDEN,
                     "Only DRIVER accounts can create driver profiles"
@@ -92,14 +95,18 @@ public class DriverService {
             );
         }
 
-        if (driverRepository.existsByDriverLicenseNumber(normalizedLicenseNumber)) {
+        if (driverRepository.existsByDriverLicenseNumber(
+                normalizedLicenseNumber)) {
+
             throw new ApiException(
                     HttpStatus.CONFLICT,
                     "Driver license number is already registered"
             );
         }
 
-        if (driverRepository.existsByVehicleLicensePlate(normalizedPlate)) {
+        if (driverRepository.existsByVehicleLicensePlate(
+                normalizedPlate)) {
+
             throw new ApiException(
                     HttpStatus.CONFLICT,
                     "Vehicle license plate is already registered"
@@ -144,6 +151,7 @@ public class DriverService {
     }
 
     public DriverResponse getDriverById(String id) {
+
         Driver driver = driverRepository.findById(id)
                 .orElseThrow(() ->
                         new ApiException(
@@ -156,13 +164,16 @@ public class DriverService {
     }
 
     public DriverResponse getDriverByUserId(String userId) {
-        Driver driver = driverRepository.findByUserId(userId.trim())
-                .orElseThrow(() ->
-                        new ApiException(
-                                HttpStatus.NOT_FOUND,
-                                "Driver not found for user ID: " + userId
-                        )
-                );
+
+        Driver driver =
+                driverRepository.findByUserId(userId.trim())
+                        .orElseThrow(() ->
+                                new ApiException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Driver not found for user ID: "
+                                                + userId
+                                )
+                        );
 
         return DriverResponse.fromEntity(driver);
     }
@@ -186,7 +197,9 @@ public class DriverService {
 
         driverRepository.findByVehicleLicensePlate(normalizedPlate)
                 .ifPresent(existing -> {
+
                     if (!existing.getId().equals(driver.getId())) {
+
                         throw new ApiException(
                                 HttpStatus.CONFLICT,
                                 "Vehicle license plate is already registered to another driver"
@@ -226,7 +239,8 @@ public class DriverService {
 
         AvailabilityStatus targetStatus = request.getStatus();
 
-        if (driver.getOperationalStatus() == OperationalStatus.SUSPENDED
+        if (driver.getOperationalStatus()
+                == OperationalStatus.SUSPENDED
                 && targetStatus == AvailabilityStatus.AVAILABLE) {
 
             throw new ApiException(
@@ -235,7 +249,8 @@ public class DriverService {
             );
         }
 
-        if (driver.getAvailabilityStatus() == AvailabilityStatus.BUSY
+        if (driver.getAvailabilityStatus()
+                == AvailabilityStatus.BUSY
                 && targetStatus == AvailabilityStatus.OFFLINE) {
 
             throw new ApiException(
@@ -301,6 +316,7 @@ public class DriverService {
     }
 
     public DriverResponse assignDriver(String id) {
+
         Driver driver = driverRepository.findById(id)
                 .orElseThrow(() ->
                         new ApiException(
@@ -309,14 +325,18 @@ public class DriverService {
                         )
                 );
 
-        if (driver.getOperationalStatus() == OperationalStatus.SUSPENDED) {
+        if (driver.getOperationalStatus()
+                == OperationalStatus.SUSPENDED) {
+
             throw new ApiException(
                     HttpStatus.FORBIDDEN,
                     "Suspended driver cannot be assigned to rides"
             );
         }
 
-        if (driver.getAvailabilityStatus() != AvailabilityStatus.AVAILABLE) {
+        if (driver.getAvailabilityStatus()
+                != AvailabilityStatus.AVAILABLE) {
+
             throw new ApiException(
                     HttpStatus.CONFLICT,
                     "Driver is not available for assignment. Current status: "
@@ -324,7 +344,10 @@ public class DriverService {
             );
         }
 
-        driver.setAvailabilityStatus(AvailabilityStatus.BUSY);
+        driver.setAvailabilityStatus(
+                AvailabilityStatus.BUSY
+        );
+
         driver.setUpdatedAt(Instant.now());
 
         Driver updated = driverRepository.save(driver);
@@ -333,6 +356,14 @@ public class DriverService {
     }
 
     public DriverResponse releaseDriver(String id) {
+
+        return releaseDriver(id, true);
+    }
+
+    public DriverResponse releaseDriver(
+            String id,
+            boolean completedRide) {
+
         Driver driver = driverRepository.findById(id)
                 .orElseThrow(() ->
                         new ApiException(
@@ -341,13 +372,22 @@ public class DriverService {
                         )
                 );
 
-        driver.setAvailabilityStatus(AvailabilityStatus.AVAILABLE);
+        driver.setAvailabilityStatus(
+                AvailabilityStatus.AVAILABLE
+        );
 
-        int completed = driver.getTotalRidesCompleted() == null
-                ? 0
-                : driver.getTotalRidesCompleted();
+        if (completedRide) {
 
-        driver.setTotalRidesCompleted(completed + 1);
+            int completed =
+                    driver.getTotalRidesCompleted() == null
+                            ? 0
+                            : driver.getTotalRidesCompleted();
+
+            driver.setTotalRidesCompleted(
+                    completed + 1
+            );
+        }
+
         driver.setUpdatedAt(Instant.now());
 
         Driver updated = driverRepository.save(driver);
@@ -367,9 +407,13 @@ public class DriverService {
                         )
                 );
 
-        driver.setOperationalStatus(request.getStatus());
+        driver.setOperationalStatus(
+                request.getStatus()
+        );
 
-        if (request.getStatus() == OperationalStatus.SUSPENDED) {
+        if (request.getStatus()
+                == OperationalStatus.SUSPENDED) {
+
             driver.setAvailabilityStatus(
                     AvailabilityStatus.OFFLINE
             );
@@ -390,10 +434,11 @@ public class DriverService {
             Double radiusKm) {
 
         List<Driver> activeAvailableDrivers =
-                driverRepository.findByOperationalStatusAndAvailabilityStatus(
-                        OperationalStatus.ACTIVE,
-                        AvailabilityStatus.AVAILABLE
-                );
+                driverRepository
+                        .findByOperationalStatusAndAvailabilityStatus(
+                                OperationalStatus.ACTIVE,
+                                AvailabilityStatus.AVAILABLE
+                        );
 
         double maxRadius =
                 (radiusKm != null && radiusKm > 0)
@@ -403,58 +448,78 @@ public class DriverService {
         return activeAvailableDrivers.stream()
 
                 .filter(driver -> {
-                    if (serviceArea != null && !serviceArea.isBlank()) {
+
+                    if (serviceArea != null
+                            && !serviceArea.isBlank()) {
+
                         return driver.getServiceArea() != null
                                 && driver.getServiceArea()
-                                .equalsIgnoreCase(serviceArea.trim());
+                                .equalsIgnoreCase(
+                                        serviceArea.trim()
+                                );
                     }
 
                     return true;
                 })
 
                 .filter(driver -> {
+
                     if (vehicleType != null) {
+
                         return driver.getVehicle() != null
                                 && driver.getVehicle()
-                                .getVehicleType() == vehicleType;
+                                .getVehicleType()
+                                == vehicleType;
                     }
 
                     return true;
                 })
 
                 .map(driver -> {
+
                     Double distance = null;
 
                     if (pickupLat != null
                             && pickupLng != null
-                            && driver.getCurrentLocation() != null) {
+                            && driver.getCurrentLocation()
+                            != null) {
 
                         Double dLat =
-                                driver.getCurrentLocation().getLatitude();
+                                driver.getCurrentLocation()
+                                        .getLatitude();
 
                         Double dLng =
-                                driver.getCurrentLocation().getLongitude();
+                                driver.getCurrentLocation()
+                                        .getLongitude();
 
                         if (dLat != null && dLng != null) {
-                            distance = calculateDistanceKm(
-                                    pickupLat,
-                                    pickupLng,
-                                    dLat,
-                                    dLng
-                            );
+
+                            distance =
+                                    calculateDistanceKm(
+                                            pickupLat,
+                                            pickupLng,
+                                            dLat,
+                                            dLng
+                                    );
                         }
                     }
 
-                    return AvailableDriverResponse.fromEntity(
-                            driver,
-                            distance
-                    );
+                    return AvailableDriverResponse
+                            .fromEntity(
+                                    driver,
+                                    distance
+                            );
                 })
 
                 .filter(response -> {
-                    if (pickupLat != null && pickupLng != null) {
-                        return response.getDistanceKm() != null
-                                && response.getDistanceKm() <= maxRadius;
+
+                    if (pickupLat != null
+                            && pickupLng != null) {
+
+                        return response.getDistanceKm()
+                                != null
+                                && response.getDistanceKm()
+                                <= maxRadius;
                     }
 
                     return true;
@@ -462,8 +527,11 @@ public class DriverService {
 
                 .sorted(
                         Comparator.comparing(
-                                AvailableDriverResponse::getDistanceKm,
-                                Comparator.nullsLast(Double::compareTo)
+                                AvailableDriverResponse
+                                        ::getDistanceKm,
+                                Comparator.nullsLast(
+                                        Double::compareTo
+                                )
                         )
                 )
 
@@ -476,11 +544,15 @@ public class DriverService {
             double lat2,
             double lon2) {
 
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
+        double dLat =
+                Math.toRadians(lat2 - lat1);
+
+        double dLon =
+                Math.toRadians(lon2 - lon1);
 
         double a =
-                Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                Math.sin(dLat / 2)
+                        * Math.sin(dLat / 2)
                         + Math.cos(Math.toRadians(lat1))
                         * Math.cos(Math.toRadians(lat2))
                         * Math.sin(dLon / 2)

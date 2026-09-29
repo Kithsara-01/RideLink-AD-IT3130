@@ -26,6 +26,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -42,13 +43,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(DriverController.class)
 @Import(SecurityConfig.class)
+@TestPropertySource(properties = {
+        "app.internal.service-key=test-internal-key"
+})
 @WithMockUser(roles = "ADMIN")
 class DriverControllerTest {
+
+    private static final String INTERNAL_KEY_HEADER =
+            "X-Internal-Service-Key";
+
+    private static final String TEST_INTERNAL_KEY =
+            "test-internal-key";
 
     @Autowired
     private MockMvc mockMvc;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper =
+            new ObjectMapper();
 
     @MockitoBean
     private DriverService driverService;
@@ -79,12 +90,17 @@ class DriverControllerTest {
         );
 
         sampleResponse = new DriverResponse();
+
         sampleResponse.setId("drv-123");
         sampleResponse.setUserId("usr-456");
         sampleResponse.setDriverLicenseNumber("DL-12345");
         sampleResponse.setPhoneNumber("+94771234567");
-        sampleResponse.setOperationalStatus(OperationalStatus.ACTIVE);
-        sampleResponse.setAvailabilityStatus(AvailabilityStatus.OFFLINE);
+        sampleResponse.setOperationalStatus(
+                OperationalStatus.ACTIVE
+        );
+        sampleResponse.setAvailabilityStatus(
+                AvailabilityStatus.OFFLINE
+        );
         sampleResponse.setServiceArea("Colombo");
         sampleResponse.setVehicle(vehicle);
         sampleResponse.setCurrentLocation(location);
@@ -94,7 +110,8 @@ class DriverControllerTest {
 
     @Test
     @DisplayName("POST /api/drivers - DRIVER JWT should return 201 Created")
-    void testRegisterDriver_ValidDriverJwt() throws Exception {
+    void testRegisterDriver_ValidDriverJwt()
+            throws Exception {
 
         VehicleDto vehicleDto = new VehicleDto(
                 "Toyota",
@@ -112,13 +129,14 @@ class DriverControllerTest {
                 "Fort Colombo"
         );
 
-        CreateDriverRequest request = new CreateDriverRequest(
-                "DL-12345",
-                "+94771234567",
-                "Colombo",
-                vehicleDto,
-                locationDto
-        );
+        CreateDriverRequest request =
+                new CreateDriverRequest(
+                        "DL-12345",
+                        "+94771234567",
+                        "Colombo",
+                        vehicleDto,
+                        locationDto
+                );
 
         when(
                 driverService.registerDriver(
@@ -132,28 +150,45 @@ class DriverControllerTest {
                                 .with(
                                         jwt()
                                                 .jwt(jwt -> jwt
-                                                        .tokenValue("driver-jwt-token")
-                                                        .claim("role", "DRIVER")
+                                                        .tokenValue(
+                                                                "driver-jwt-token")
+                                                        .claim(
+                                                                "role",
+                                                                "DRIVER")
                                                 )
-                                                .authorities(() -> "ROLE_DRIVER")
+                                                .authorities(
+                                                        () -> "ROLE_DRIVER")
                                 )
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request))
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper
+                                                .writeValueAsString(
+                                                        request))
                 )
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value("drv-123"))
-                .andExpect(jsonPath("$.userId").value("usr-456"))
-                .andExpect(jsonPath("$.operationalStatus").value("ACTIVE"));
+                .andExpect(
+                        status().isCreated())
+                .andExpect(
+                        jsonPath("$.id")
+                                .value("drv-123"))
+                .andExpect(
+                        jsonPath("$.userId")
+                                .value("usr-456"))
+                .andExpect(
+                        jsonPath("$.operationalStatus")
+                                .value("ACTIVE"));
 
-        verify(driverService).registerDriver(
-                any(CreateDriverRequest.class),
-                eq("driver-jwt-token")
-        );
+        verify(driverService)
+                .registerDriver(
+                        any(CreateDriverRequest.class),
+                        eq("driver-jwt-token")
+                );
     }
 
     @Test
     @DisplayName("POST /api/drivers - RIDER JWT should return 403 Forbidden")
-    void testRegisterDriver_RiderForbidden() throws Exception {
+    void testRegisterDriver_RiderForbidden()
+            throws Exception {
 
         VehicleDto vehicleDto = new VehicleDto(
                 "Toyota",
@@ -171,34 +206,45 @@ class DriverControllerTest {
                 "Fort Colombo"
         );
 
-        CreateDriverRequest request = new CreateDriverRequest(
-                "DL-12345",
-                "+94771234567",
-                "Colombo",
-                vehicleDto,
-                locationDto
-        );
+        CreateDriverRequest request =
+                new CreateDriverRequest(
+                        "DL-12345",
+                        "+94771234567",
+                        "Colombo",
+                        vehicleDto,
+                        locationDto
+                );
 
         mockMvc.perform(
                         post("/api/drivers")
                                 .with(
                                         jwt()
                                                 .jwt(jwt -> jwt
-                                                        .tokenValue("rider-jwt-token")
-                                                        .claim("role", "RIDER")
+                                                        .tokenValue(
+                                                                "rider-jwt-token")
+                                                        .claim(
+                                                                "role",
+                                                                "RIDER")
                                                 )
-                                                .authorities(() -> "ROLE_RIDER")
+                                                .authorities(
+                                                        () -> "ROLE_RIDER")
                                 )
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request))
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper
+                                                .writeValueAsString(
+                                                        request))
                 )
-                .andExpect(status().isForbidden());
+                .andExpect(
+                        status().isForbidden());
     }
 
     @Test
     @WithAnonymousUser
     @DisplayName("POST /api/drivers - no JWT should return 401 Unauthorized")
-    void testRegisterDriver_NoJwtUnauthorized() throws Exception {
+    void testRegisterDriver_NoJwtUnauthorized()
+            throws Exception {
 
         VehicleDto vehicleDto = new VehicleDto(
                 "Toyota",
@@ -216,25 +262,32 @@ class DriverControllerTest {
                 "Fort Colombo"
         );
 
-        CreateDriverRequest request = new CreateDriverRequest(
-                "DL-12345",
-                "+94771234567",
-                "Colombo",
-                vehicleDto,
-                locationDto
-        );
+        CreateDriverRequest request =
+                new CreateDriverRequest(
+                        "DL-12345",
+                        "+94771234567",
+                        "Colombo",
+                        vehicleDto,
+                        locationDto
+                );
 
         mockMvc.perform(
                         post("/api/drivers")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request))
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper
+                                                .writeValueAsString(
+                                                        request))
                 )
-                .andExpect(status().isUnauthorized());
+                .andExpect(
+                        status().isUnauthorized());
     }
 
     @Test
     @DisplayName("POST /api/drivers - should return 400 Bad Request on invalid coordinates")
-    void testRegisterDriver_InvalidCoordinates() throws Exception {
+    void testRegisterDriver_InvalidCoordinates()
+            throws Exception {
 
         VehicleDto vehicleDto = new VehicleDto(
                 "Toyota",
@@ -252,39 +305,55 @@ class DriverControllerTest {
                 "Invalid Location"
         );
 
-        CreateDriverRequest request = new CreateDriverRequest(
-                "DL-12345",
-                "+94771234567",
-                "Colombo",
-                vehicleDto,
-                locationDto
-        );
+        CreateDriverRequest request =
+                new CreateDriverRequest(
+                        "DL-12345",
+                        "+94771234567",
+                        "Colombo",
+                        vehicleDto,
+                        locationDto
+                );
 
         mockMvc.perform(
                         post("/api/drivers")
                                 .with(
                                         jwt()
                                                 .jwt(jwt -> jwt
-                                                        .tokenValue("driver-jwt-token")
-                                                        .claim("role", "DRIVER")
+                                                        .tokenValue(
+                                                                "driver-jwt-token")
+                                                        .claim(
+                                                                "role",
+                                                                "DRIVER")
                                                 )
-                                                .authorities(() -> "ROLE_DRIVER")
+                                                .authorities(
+                                                        () -> "ROLE_DRIVER")
                                 )
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request))
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper
+                                                .writeValueAsString(
+                                                        request))
                 )
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value("Validation failed"))
                 .andExpect(
-                        jsonPath("$.errors['initialLocation.latitude']")
+                        status().isBadRequest())
+                .andExpect(
+                        jsonPath("$.status")
+                                .value(400))
+                .andExpect(
+                        jsonPath("$.message")
+                                .value("Validation failed"))
+                .andExpect(
+                        jsonPath(
+                                "$.errors['initialLocation.latitude']")
                                 .exists()
                 );
     }
 
     @Test
     @DisplayName("GET /api/drivers/{id} - should return 200 OK")
-    void testGetDriverById_Success() throws Exception {
+    void testGetDriverById_Success()
+            throws Exception {
 
         when(driverService.getDriverById("drv-123"))
                 .thenReturn(sampleResponse);
@@ -292,17 +361,20 @@ class DriverControllerTest {
         mockMvc.perform(
                         get("/api/drivers/drv-123")
                 )
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("drv-123"))
+                .andExpect(
+                        status().isOk())
+                .andExpect(
+                        jsonPath("$.id")
+                                .value("drv-123"))
                 .andExpect(
                         jsonPath("$.driverLicenseNumber")
-                                .value("DL-12345")
-                );
+                                .value("DL-12345"));
     }
 
     @Test
     @DisplayName("PATCH /api/drivers/{id}/availability - should return 200 OK")
-    void testUpdateAvailability_Success() throws Exception {
+    void testUpdateAvailability_Success()
+            throws Exception {
 
         sampleResponse.setAvailabilityStatus(
                 AvailabilityStatus.AVAILABLE
@@ -321,20 +393,27 @@ class DriverControllerTest {
                 );
 
         mockMvc.perform(
-                        patch("/api/drivers/drv-123/availability")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request))
+                        patch(
+                                "/api/drivers/drv-123/availability")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        objectMapper
+                                                .writeValueAsString(
+                                                        request))
                 )
-                .andExpect(status().isOk())
+                .andExpect(
+                        status().isOk())
                 .andExpect(
                         jsonPath("$.availabilityStatus")
-                                .value("AVAILABLE")
-                );
+                                .value("AVAILABLE"));
     }
 
     @Test
-    @DisplayName("PATCH /api/drivers/{id}/assign - should return 200 OK")
-    void testAssignDriver_Success() throws Exception {
+    @WithAnonymousUser
+    @DisplayName("PATCH /api/drivers/{id}/assign - correct internal key should return 200 OK")
+    void testAssignDriver_CorrectInternalKey()
+            throws Exception {
 
         sampleResponse.setAvailabilityStatus(
                 AvailabilityStatus.BUSY
@@ -345,17 +424,54 @@ class DriverControllerTest {
 
         mockMvc.perform(
                         patch("/api/drivers/drv-123/assign")
+                                .header(
+                                        INTERNAL_KEY_HEADER,
+                                        TEST_INTERNAL_KEY)
                 )
-                .andExpect(status().isOk())
+                .andExpect(
+                        status().isOk())
                 .andExpect(
                         jsonPath("$.availabilityStatus")
-                                .value("BUSY")
-                );
+                                .value("BUSY"));
+
+        verify(driverService)
+                .assignDriver("drv-123");
     }
 
     @Test
-    @DisplayName("PATCH /api/drivers/{id}/release - should return 200 OK")
-    void testReleaseDriver_Success() throws Exception {
+    @WithAnonymousUser
+    @DisplayName("PATCH /api/drivers/{id}/assign - missing internal key should return 401")
+    void testAssignDriver_MissingInternalKey()
+            throws Exception {
+
+        mockMvc.perform(
+                        patch("/api/drivers/drv-123/assign")
+                )
+                .andExpect(
+                        status().isUnauthorized());
+    }
+
+    @Test
+    @WithAnonymousUser
+    @DisplayName("PATCH /api/drivers/{id}/assign - wrong internal key should return 401")
+    void testAssignDriver_WrongInternalKey()
+            throws Exception {
+
+        mockMvc.perform(
+                        patch("/api/drivers/drv-123/assign")
+                                .header(
+                                        INTERNAL_KEY_HEADER,
+                                        "wrong-key")
+                )
+                .andExpect(
+                        status().isUnauthorized());
+    }
+
+    @Test
+    @WithAnonymousUser
+    @DisplayName("PATCH /api/drivers/{id}/release - completed ride should return 200 OK")
+    void testReleaseDriver_CompletedRide()
+            throws Exception {
 
         sampleResponse.setAvailabilityStatus(
                 AvailabilityStatus.AVAILABLE
@@ -363,26 +479,87 @@ class DriverControllerTest {
 
         sampleResponse.setTotalRidesCompleted(1);
 
-        when(driverService.releaseDriver("drv-123"))
-                .thenReturn(sampleResponse);
+        when(
+                driverService.releaseDriver(
+                        "drv-123",
+                        true
+                )
+        ).thenReturn(sampleResponse);
 
         mockMvc.perform(
                         patch("/api/drivers/drv-123/release")
+                                .param(
+                                        "completed",
+                                        "true")
+                                .header(
+                                        INTERNAL_KEY_HEADER,
+                                        TEST_INTERNAL_KEY)
                 )
-                .andExpect(status().isOk())
+                .andExpect(
+                        status().isOk())
                 .andExpect(
                         jsonPath("$.availabilityStatus")
-                                .value("AVAILABLE")
-                )
+                                .value("AVAILABLE"))
                 .andExpect(
                         jsonPath("$.totalRidesCompleted")
-                                .value(1)
+                                .value(1));
+
+        verify(driverService)
+                .releaseDriver(
+                        "drv-123",
+                        true
                 );
     }
 
     @Test
-    @DisplayName("GET /api/drivers/available - should return 200 OK with candidates")
-    void testFindAvailableDrivers_Success() throws Exception {
+    @WithAnonymousUser
+    @DisplayName("PATCH /api/drivers/{id}/release - cancelled ride should return 200 OK")
+    void testReleaseDriver_CancelledRide()
+            throws Exception {
+
+        sampleResponse.setAvailabilityStatus(
+                AvailabilityStatus.AVAILABLE
+        );
+
+        sampleResponse.setTotalRidesCompleted(5);
+
+        when(
+                driverService.releaseDriver(
+                        "drv-123",
+                        false
+                )
+        ).thenReturn(sampleResponse);
+
+        mockMvc.perform(
+                        patch("/api/drivers/drv-123/release")
+                                .param(
+                                        "completed",
+                                        "false")
+                                .header(
+                                        INTERNAL_KEY_HEADER,
+                                        TEST_INTERNAL_KEY)
+                )
+                .andExpect(
+                        status().isOk())
+                .andExpect(
+                        jsonPath("$.availabilityStatus")
+                                .value("AVAILABLE"))
+                .andExpect(
+                        jsonPath("$.totalRidesCompleted")
+                                .value(5));
+
+        verify(driverService)
+                .releaseDriver(
+                        "drv-123",
+                        false
+                );
+    }
+
+    @Test
+    @WithAnonymousUser
+    @DisplayName("GET /api/drivers/available - correct internal key should return 200 OK with candidates")
+    void testFindAvailableDrivers_CorrectInternalKey()
+            throws Exception {
 
         AvailableDriverResponse candidate =
                 new AvailableDriverResponse();
@@ -399,20 +576,26 @@ class DriverControllerTest {
                         any(),
                         any()
                 )
-        ).thenReturn(List.of(candidate));
+        ).thenReturn(
+                List.of(candidate)
+        );
 
         mockMvc.perform(
                         get("/api/drivers/available")
-                                .param("serviceArea", "Colombo")
+                                .param(
+                                        "serviceArea",
+                                        "Colombo")
+                                .header(
+                                        INTERNAL_KEY_HEADER,
+                                        TEST_INTERNAL_KEY)
                 )
-                .andExpect(status().isOk())
+                .andExpect(
+                        status().isOk())
                 .andExpect(
                         jsonPath("$[0].id")
-                                .value("drv-123")
-                )
+                                .value("drv-123"))
                 .andExpect(
                         jsonPath("$[0].distanceKm")
-                                .value(1.5)
-                );
+                                .value(1.5));
     }
 }

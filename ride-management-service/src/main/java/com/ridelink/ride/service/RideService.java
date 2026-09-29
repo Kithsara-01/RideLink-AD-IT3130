@@ -41,9 +41,12 @@ public class RideService {
         this.accountClient = accountClient;
     }
 
-    public RideResponse createRide(CreateRideRequest request, String bearerToken) {
+    public RideResponse createRide(
+            CreateRideRequest request,
+            String bearerToken) {
 
-        AccountResponse account = accountClient.getCurrentAccount(bearerToken);
+        AccountResponse account =
+                accountClient.getCurrentAccount(bearerToken);
 
         if (!account.isActive()) {
             throw new ApiException(
@@ -57,17 +60,29 @@ public class RideService {
                     "Only RIDER accounts can create rides");
         }
 
-        if (account.getId() == null || account.getId().isBlank()) {
+        if (account.getId() == null
+                || account.getId().isBlank()) {
+
             throw new ApiException(
                     HttpStatus.BAD_GATEWAY,
                     "Account Service returned an invalid account ID");
         }
 
-        RideLocation pickup = toLocation(request.getPickup());
-        RideLocation destination = toLocation(request.getDestination());
+        RideLocation pickup =
+                toLocation(request.getPickup());
 
-        double distanceKm = distanceInKm(pickup, destination);
-        double estimatedFare = round(BASE_FARE + (distanceKm * RATE_PER_KM));
+        RideLocation destination =
+                toLocation(request.getDestination());
+
+        double distanceKm =
+                distanceInKm(
+                        pickup,
+                        destination);
+
+        double estimatedFare =
+                round(
+                        BASE_FARE
+                                + (distanceKm * RATE_PER_KM));
 
         Ride ride = new Ride(
                 account.getId().trim(),
@@ -76,38 +91,52 @@ public class RideService {
                 request.getVehicleType(),
                 estimatedFare);
 
-        return RideResponse.fromEntity(rideRepository.save(ride));
+        return RideResponse.fromEntity(
+                rideRepository.save(ride));
     }
 
     public RideResponse getRide(String id) {
-        return RideResponse.fromEntity(findRide(id));
+        return RideResponse.fromEntity(
+                findRide(id));
     }
 
-    public List<RideResponse> getPassengerRides(String passengerId) {
-        return rideRepository.findByPassengerIdOrderByRequestedAtDesc(passengerId.trim())
+    public List<RideResponse> getPassengerRides(
+            String passengerId) {
+
+        return rideRepository
+                .findByPassengerIdOrderByRequestedAtDesc(
+                        passengerId.trim())
                 .stream()
                 .map(RideResponse::fromEntity)
                 .toList();
     }
 
-    public List<RideResponse> getDriverRides(String driverId) {
-        return rideRepository.findByDriverIdOrderByRequestedAtDesc(driverId.trim())
+    public List<RideResponse> getDriverRides(
+            String driverId) {
+
+        return rideRepository
+                .findByDriverIdOrderByRequestedAtDesc(
+                        driverId.trim())
                 .stream()
                 .map(RideResponse::fromEntity)
                 .toList();
     }
 
     public RideResponse assignRide(String id) {
+
         Ride ride = findRide(id);
 
-        requireStatus(ride, RideStatus.REQUESTED);
+        requireStatus(
+                ride,
+                RideStatus.REQUESTED);
 
-        List<AvailableDriverResponse> drivers = driverClient.findAvailableDrivers(
-                null,
-                ride.getVehicleType(),
-                ride.getPickup().getLatitude(),
-                ride.getPickup().getLongitude()
-        );
+        List<AvailableDriverResponse> drivers =
+                driverClient.findAvailableDrivers(
+                        null,
+                        ride.getVehicleType(),
+                        ride.getPickup().getLatitude(),
+                        ride.getPickup().getLongitude()
+                );
 
         if (drivers == null || drivers.isEmpty()) {
             throw new ApiException(
@@ -115,9 +144,12 @@ public class RideService {
                     "No available driver matches this ride request");
         }
 
-        String driverId = drivers.get(0).getId();
+        String driverId =
+                drivers.get(0).getId();
 
-        if (driverId == null || driverId.isBlank()) {
+        if (driverId == null
+                || driverId.isBlank()) {
+
             throw new ApiException(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "Driver service returned an invalid driver ID");
@@ -130,26 +162,38 @@ public class RideService {
 
         touch(ride);
 
-        return RideResponse.fromEntity(rideRepository.save(ride));
+        return RideResponse.fromEntity(
+                rideRepository.save(ride));
     }
 
-    public RideResponse updateStatus(String id, UpdateRideStatusRequest request) {
+    public RideResponse updateStatus(
+            String id,
+            UpdateRideStatusRequest request) {
 
         Ride ride = findRide(id);
 
-        RideStatus current = ride.getStatus();
-        RideStatus target = request.getStatus();
+        RideStatus current =
+                ride.getStatus();
 
-        if (!allowedTransitions(current).contains(target)) {
+        RideStatus target =
+                request.getStatus();
+
+        if (!allowedTransitions(current)
+                .contains(target)) {
+
             throw new ApiException(
                     HttpStatus.CONFLICT,
-                    "Invalid ride status transition from " + current + " to " + target);
+                    "Invalid ride status transition from "
+                            + current
+                            + " to "
+                            + target);
         }
 
         if (target == RideStatus.CANCELLED) {
 
             if (request.getCancellationReason() == null
-                    || request.getCancellationReason().isBlank()) {
+                    || request.getCancellationReason()
+                    .isBlank()) {
 
                 throw new ApiException(
                         HttpStatus.BAD_REQUEST,
@@ -157,29 +201,44 @@ public class RideService {
             }
 
             ride.setCancellationReason(
-                    request.getCancellationReason().trim());
+                    request.getCancellationReason()
+                            .trim());
 
-            ride.setCancelledAt(Instant.now());
+            ride.setCancelledAt(
+                    Instant.now());
 
             if (ride.getDriverId() != null) {
-                driverClient.releaseDriver(ride.getDriverId());
+
+                driverClient.releaseDriver(
+                        ride.getDriverId(),
+                        false
+                );
             }
 
         } else if (target == RideStatus.ACCEPTED) {
 
-            ride.setAcceptedAt(Instant.now());
+            ride.setAcceptedAt(
+                    Instant.now());
 
         } else if (target == RideStatus.IN_PROGRESS) {
 
-            ride.setStartedAt(Instant.now());
+            ride.setStartedAt(
+                    Instant.now());
 
         } else if (target == RideStatus.COMPLETED) {
 
-            ride.setCompletedAt(Instant.now());
-            ride.setFinalFare(ride.getEstimatedFare());
+            ride.setCompletedAt(
+                    Instant.now());
+
+            ride.setFinalFare(
+                    ride.getEstimatedFare());
 
             if (ride.getDriverId() != null) {
-                driverClient.releaseDriver(ride.getDriverId());
+
+                driverClient.releaseDriver(
+                        ride.getDriverId(),
+                        true
+                );
             }
         }
 
@@ -192,6 +251,7 @@ public class RideService {
     }
 
     private Ride findRide(String id) {
+
         return rideRepository.findById(id)
                 .orElseThrow(() ->
                         new ApiException(
@@ -204,6 +264,7 @@ public class RideService {
             RideStatus expected) {
 
         if (ride.getStatus() != expected) {
+
             throw new ApiException(
                     HttpStatus.CONFLICT,
                     "Ride must be in "
@@ -219,7 +280,8 @@ public class RideService {
         return switch (status) {
 
             case REQUESTED ->
-                    EnumSet.of(RideStatus.CANCELLED);
+                    EnumSet.of(
+                            RideStatus.CANCELLED);
 
             case ASSIGNED ->
                     EnumSet.of(
@@ -237,7 +299,8 @@ public class RideService {
                             RideStatus.CANCELLED);
 
             case COMPLETED, CANCELLED ->
-                    EnumSet.noneOf(RideStatus.class);
+                    EnumSet.noneOf(
+                            RideStatus.class);
         };
     }
 
@@ -251,7 +314,8 @@ public class RideService {
     }
 
     private void touch(Ride ride) {
-        ride.setUpdatedAt(Instant.now());
+        ride.setUpdatedAt(
+                Instant.now());
     }
 
     private double distanceInKm(
@@ -288,6 +352,7 @@ public class RideService {
     }
 
     private double round(double value) {
-        return Math.round(value * 100.0) / 100.0;
+        return Math.round(
+                value * 100.0) / 100.0;
     }
 }

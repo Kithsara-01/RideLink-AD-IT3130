@@ -9,22 +9,25 @@ import com.ridelink.driver.dto.LocationDto;
 import com.ridelink.driver.dto.UpdateAvailabilityRequest;
 import com.ridelink.driver.dto.UpdateLocationRequest;
 import com.ridelink.driver.dto.VehicleDto;
-import com.ridelink.driver.exception.ApiException;
 import com.ridelink.driver.entity.AvailabilityStatus;
 import com.ridelink.driver.entity.Driver;
 import com.ridelink.driver.entity.Location;
 import com.ridelink.driver.entity.OperationalStatus;
 import com.ridelink.driver.entity.Vehicle;
 import com.ridelink.driver.entity.VehicleType;
+import com.ridelink.driver.exception.ApiException;
 import com.ridelink.driver.repository.DriverRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
 import org.springframework.http.HttpStatus;
 
 import java.util.Collections;
@@ -139,12 +142,18 @@ class DriverServiceTest {
                 });
 
         DriverResponse response =
-                driverService.registerDriver(createRequest, TEST_TOKEN);
+                driverService.registerDriver(
+                        createRequest,
+                        TEST_TOKEN
+                );
 
         assertNotNull(response);
         assertEquals("generated-id-1", response.getId());
         assertEquals("user-101", response.getUserId());
-        assertEquals("DL-12345", response.getDriverLicenseNumber());
+        assertEquals(
+                "DL-12345",
+                response.getDriverLicenseNumber()
+        );
         assertEquals(
                 OperationalStatus.ACTIVE,
                 response.getOperationalStatus()
@@ -154,10 +163,10 @@ class DriverServiceTest {
                 response.getAvailabilityStatus()
         );
 
-        verify(accountClient, times(1))
+        verify(accountClient)
                 .getCurrentAccount(TEST_TOKEN);
 
-        verify(driverRepository, times(1))
+        verify(driverRepository)
                 .save(any(Driver.class));
     }
 
@@ -186,14 +195,19 @@ class DriverServiceTest {
                     return driver;
                 });
 
-        driverService.registerDriver(createRequest, TEST_TOKEN);
+        driverService.registerDriver(
+                createRequest,
+                TEST_TOKEN
+        );
 
         ArgumentCaptor<Driver> driverCaptor =
                 ArgumentCaptor.forClass(Driver.class);
 
-        verify(driverRepository).save(driverCaptor.capture());
+        verify(driverRepository)
+                .save(driverCaptor.capture());
 
-        Driver savedDriver = driverCaptor.getValue();
+        Driver savedDriver =
+                driverCaptor.getValue();
 
         assertEquals(
                 "account-driver-555",
@@ -205,7 +219,9 @@ class DriverServiceTest {
     @DisplayName("RIDER account should not create a driver profile")
     void testRegisterDriver_RiderAccountForbidden() {
 
-        AccountResponse riderAccount = new AccountResponse();
+        AccountResponse riderAccount =
+                new AccountResponse();
+
         riderAccount.setId("rider-101");
         riderAccount.setRole("RIDER");
         riderAccount.setActive(true);
@@ -239,7 +255,9 @@ class DriverServiceTest {
     @DisplayName("Inactive account should not create a driver profile")
     void testRegisterDriver_InactiveAccountForbidden() {
 
-        AccountResponse inactiveAccount = new AccountResponse();
+        AccountResponse inactiveAccount =
+                new AccountResponse();
+
         inactiveAccount.setId("user-101");
         inactiveAccount.setRole("DRIVER");
         inactiveAccount.setActive(false);
@@ -273,7 +291,9 @@ class DriverServiceTest {
     @DisplayName("Missing Account Service user ID should be rejected")
     void testRegisterDriver_MissingAccountId() {
 
-        AccountResponse invalidAccount = new AccountResponse();
+        AccountResponse invalidAccount =
+                new AccountResponse();
+
         invalidAccount.setId(" ");
         invalidAccount.setRole("DRIVER");
         invalidAccount.setActive(true);
@@ -381,10 +401,16 @@ class DriverServiceTest {
                 .thenReturn(Optional.of(sampleDriver));
 
         DriverResponse response =
-                driverService.getDriverById("driver-001");
+                driverService.getDriverById(
+                        "driver-001"
+                );
 
         assertNotNull(response);
-        assertEquals("driver-001", response.getId());
+
+        assertEquals(
+                "driver-001",
+                response.getId()
+        );
     }
 
     @Test
@@ -396,7 +422,9 @@ class DriverServiceTest {
 
         ApiException exception = assertThrows(
                 ApiException.class,
-                () -> driverService.getDriverById("unknown-id")
+                () -> driverService.getDriverById(
+                        "unknown-id"
+                )
         );
 
         assertEquals(
@@ -511,7 +539,9 @@ class DriverServiceTest {
                 );
 
         DriverResponse response =
-                driverService.assignDriver("driver-001");
+                driverService.assignDriver(
+                        "driver-001"
+                );
 
         assertEquals(
                 AvailabilityStatus.BUSY,
@@ -532,7 +562,9 @@ class DriverServiceTest {
 
         ApiException exception = assertThrows(
                 ApiException.class,
-                () -> driverService.assignDriver("driver-001")
+                () -> driverService.assignDriver(
+                        "driver-001"
+                )
         );
 
         assertEquals(
@@ -542,8 +574,8 @@ class DriverServiceTest {
     }
 
     @Test
-    @DisplayName("Should release driver back to AVAILABLE and increment rides count")
-    void testReleaseDriver_Success() {
+    @DisplayName("Completed ride should release driver and increment completed ride count")
+    void testReleaseDriver_CompletedRide() {
 
         sampleDriver.setAvailabilityStatus(
                 AvailabilityStatus.BUSY
@@ -560,7 +592,10 @@ class DriverServiceTest {
                 );
 
         DriverResponse response =
-                driverService.releaseDriver("driver-001");
+                driverService.releaseDriver(
+                        "driver-001",
+                        true
+                );
 
         assertEquals(
                 AvailabilityStatus.AVAILABLE,
@@ -569,6 +604,41 @@ class DriverServiceTest {
 
         assertEquals(
                 6,
+                response.getTotalRidesCompleted()
+        );
+    }
+
+    @Test
+    @DisplayName("Cancelled ride should release driver without incrementing completed ride count")
+    void testReleaseDriver_CancelledRide() {
+
+        sampleDriver.setAvailabilityStatus(
+                AvailabilityStatus.BUSY
+        );
+
+        sampleDriver.setTotalRidesCompleted(5);
+
+        when(driverRepository.findById("driver-001"))
+                .thenReturn(Optional.of(sampleDriver));
+
+        when(driverRepository.save(any(Driver.class)))
+                .thenAnswer(invocation ->
+                        invocation.getArgument(0)
+                );
+
+        DriverResponse response =
+                driverService.releaseDriver(
+                        "driver-001",
+                        false
+                );
+
+        assertEquals(
+                AvailabilityStatus.AVAILABLE,
+                response.getAvailabilityStatus()
+        );
+
+        assertEquals(
+                5,
                 response.getTotalRidesCompleted()
         );
     }
@@ -601,12 +671,14 @@ class DriverServiceTest {
 
         assertEquals(
                 6.9350,
-                response.getCurrentLocation().getLatitude()
+                response.getCurrentLocation()
+                        .getLatitude()
         );
 
         assertEquals(
                 79.8500,
-                response.getCurrentLocation().getLongitude()
+                response.getCurrentLocation()
+                        .getLongitude()
         );
 
         assertEquals(
@@ -651,9 +723,11 @@ class DriverServiceTest {
         );
 
         farDriver.setId("driver-002");
+
         farDriver.setOperationalStatus(
                 OperationalStatus.ACTIVE
         );
+
         farDriver.setAvailabilityStatus(
                 AvailabilityStatus.AVAILABLE
         );
@@ -665,7 +739,10 @@ class DriverServiceTest {
                                 AvailabilityStatus.AVAILABLE
                         )
         ).thenReturn(
-                List.of(sampleDriver, farDriver)
+                List.of(
+                        sampleDriver,
+                        farDriver
+                )
         );
 
         List<AvailableDriverResponse> results =
@@ -677,7 +754,10 @@ class DriverServiceTest {
                         15.0
                 );
 
-        assertEquals(1, results.size());
+        assertEquals(
+                1,
+                results.size()
+        );
 
         assertEquals(
                 "driver-001",
@@ -685,11 +765,13 @@ class DriverServiceTest {
         );
 
         assertNotNull(
-                results.get(0).getDistanceKm()
+                results.get(0)
+                        .getDistanceKm()
         );
 
         assertTrue(
-                results.get(0).getDistanceKm() < 1.0
+                results.get(0)
+                        .getDistanceKm() < 1.0
         );
     }
 
@@ -703,7 +785,9 @@ class DriverServiceTest {
                                 OperationalStatus.ACTIVE,
                                 AvailabilityStatus.AVAILABLE
                         )
-        ).thenReturn(Collections.emptyList());
+        ).thenReturn(
+                Collections.emptyList()
+        );
 
         List<AvailableDriverResponse> results =
                 driverService.findAvailableDrivers(
