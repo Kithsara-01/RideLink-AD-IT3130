@@ -3,6 +3,7 @@ package com.ridelink.payment.service;
 import com.ridelink.payment.dto.PaymentRequest;
 import com.ridelink.payment.dto.PaymentResponse;
 import com.ridelink.payment.dto.ReceiptResponse;
+import com.ridelink.payment.dto.RideResponse;
 import com.ridelink.payment.exception.FinalFareNotFoundException;
 import com.ridelink.payment.exception.InvalidPaymentStateException;
 import com.ridelink.payment.exception.PaymentNotFoundException;
@@ -14,6 +15,9 @@ import com.ridelink.payment.model.Receipt;
 import com.ridelink.payment.model.SimulationOutcome;
 import com.ridelink.payment.repository.FinalFareRepository;
 import com.ridelink.payment.repository.PaymentRepository;
+import com.ridelink.payment.security.PaymentAuthorizationService;
+
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -23,23 +27,43 @@ import java.util.UUID;
 @Service
 public class PaymentService {
 
+    private static final String COMPLETED_STATUS = "COMPLETED";
+
     private final PaymentRepository paymentRepository;
     private final FinalFareRepository finalFareRepository;
+    private final PaymentAuthorizationService paymentAuthorizationService;
 
     public PaymentService(
             PaymentRepository paymentRepository,
-            FinalFareRepository finalFareRepository) {
+            FinalFareRepository finalFareRepository,
+            PaymentAuthorizationService paymentAuthorizationService) {
 
         this.paymentRepository = paymentRepository;
         this.finalFareRepository = finalFareRepository;
+        this.paymentAuthorizationService = paymentAuthorizationService;
     }
 
-    public PaymentResponse recordPayment(PaymentRequest request) {
+    public PaymentResponse recordPayment(
+            PaymentRequest request,
+            Authentication authentication,
+            String bearerToken) {
+
+        RideResponse ride =
+                paymentAuthorizationService.authorizeRideAccess(
+                        request.getRideId(),
+                        authentication,
+                        bearerToken);
+
+        if (!COMPLETED_STATUS.equals(ride.status())) {
+            throw new InvalidPaymentStateException(
+                    "Payment can only be recorded for a completed ride");
+        }
 
         FinalFare finalFare = finalFareRepository
                 .findByRideId(request.getRideId())
                 .orElseThrow(() -> new FinalFareNotFoundException(
-                        "Final fare not found for ride: " + request.getRideId()));
+                        "Final fare not found for ride: "
+                                + request.getRideId()));
 
         Optional<Payment> existingPayment =
                 paymentRepository.findByRideId(request.getRideId());
@@ -50,7 +74,9 @@ public class PaymentService {
 
             if (payment.getStatus() == PaymentStatus.SUCCESS) {
 
-                if (request.getSimulationOutcome() == SimulationOutcome.FAILED) {
+                if (request.getSimulationOutcome()
+                        == SimulationOutcome.FAILED) {
+
                     throw new InvalidPaymentStateException(
                             "Successful payment cannot be changed to failed");
                 }
@@ -58,35 +84,64 @@ public class PaymentService {
                 return toResponse(payment);
             }
 
-            return retryPayment(payment, request, finalFare);
+            return retryPayment(
+                    payment,
+                    request,
+                    finalFare);
         }
 
-        return createPayment(finalFare, request);
+        return createPayment(
+                finalFare,
+                request);
     }
 
-    public PaymentResponse getPaymentById(String paymentId) {
+    public PaymentResponse getPaymentById(
+            String paymentId,
+            Authentication authentication,
+            String bearerToken) {
 
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new PaymentNotFoundException(
                         "Payment not found: " + paymentId));
 
+        paymentAuthorizationService.authorizeRideAccess(
+                payment.getRideId(),
+                authentication,
+                bearerToken);
+
         return toResponse(payment);
     }
 
-    public PaymentResponse getPaymentByRideId(String rideId) {
+    public PaymentResponse getPaymentByRideId(
+            String rideId,
+            Authentication authentication,
+            String bearerToken) {
 
         Payment payment = paymentRepository.findByRideId(rideId)
                 .orElseThrow(() -> new PaymentNotFoundException(
                         "Payment not found for ride: " + rideId));
 
+        paymentAuthorizationService.authorizeRideAccess(
+                payment.getRideId(),
+                authentication,
+                bearerToken);
+
         return toResponse(payment);
     }
 
-    public ReceiptResponse getReceiptByPaymentId(String paymentId) {
+    public ReceiptResponse getReceiptByPaymentId(
+            String paymentId,
+            Authentication authentication,
+            String bearerToken) {
 
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new PaymentNotFoundException(
                         "Payment not found: " + paymentId));
+
+        paymentAuthorizationService.authorizeRideAccess(
+                payment.getRideId(),
+                authentication,
+                bearerToken);
 
         if (payment.getStatus() != PaymentStatus.SUCCESS) {
             throw new InvalidPaymentStateException(
@@ -101,12 +156,20 @@ public class PaymentService {
         return toReceiptResponse(payment);
     }
 
-    public ReceiptResponse getReceiptByReceiptNumber(String receiptNumber) {
+    public ReceiptResponse getReceiptByReceiptNumber(
+            String receiptNumber,
+            Authentication authentication,
+            String bearerToken) {
 
         Payment payment = paymentRepository
                 .findByReceiptReceiptNumber(receiptNumber)
                 .orElseThrow(() -> new ReceiptNotFoundException(
                         "Receipt not found: " + receiptNumber));
+
+        paymentAuthorizationService.authorizeRideAccess(
+                payment.getRideId(),
+                authentication,
+                bearerToken);
 
         return toReceiptResponse(payment);
     }
@@ -128,17 +191,26 @@ public class PaymentService {
         payment.setCreatedAt(now);
         payment.setUpdatedAt(now);
 
-        if (request.getSimulationOutcome() == SimulationOutcome.SUCCESS) {
+        if (request.getSimulationOutcome()
+                == SimulationOutcome.SUCCESS) {
+
             payment.setStatus(PaymentStatus.SUCCESS);
             payment.setPaidAt(now);
-            payment.setReceipt(createReceipt(finalFare, payment, now));
+            payment.setReceipt(
+                    createReceipt(
+                            finalFare,
+                            payment,
+                            now));
+
         } else {
+
             payment.setStatus(PaymentStatus.FAILED);
             payment.setPaidAt(null);
             payment.setReceipt(null);
         }
 
-        return toResponse(paymentRepository.save(payment));
+        return toResponse(
+                paymentRepository.save(payment));
     }
 
     private PaymentResponse retryPayment(
@@ -149,23 +221,32 @@ public class PaymentService {
         Instant now = Instant.now();
 
         payment.setPaymentMethod(request.getPaymentMethod());
-        payment.setAttemptCount(payment.getAttemptCount() + 1);
+        payment.setAttemptCount(
+                payment.getAttemptCount() + 1);
         payment.setUpdatedAt(now);
 
-        if (request.getSimulationOutcome() == SimulationOutcome.SUCCESS) {
+        if (request.getSimulationOutcome()
+                == SimulationOutcome.SUCCESS) {
+
             payment.setStatus(PaymentStatus.SUCCESS);
             payment.setPaidAt(now);
 
             if (payment.getReceipt() == null) {
-                payment.setReceipt(createReceipt(finalFare, payment, now));
+                payment.setReceipt(
+                        createReceipt(
+                                finalFare,
+                                payment,
+                                now));
             }
 
         } else {
+
             payment.setStatus(PaymentStatus.FAILED);
             payment.setPaidAt(null);
         }
 
-        return toResponse(paymentRepository.save(payment));
+        return toResponse(
+                paymentRepository.save(payment));
     }
 
     private Receipt createReceipt(
@@ -176,61 +257,123 @@ public class PaymentService {
         Receipt receipt = new Receipt();
 
         receipt.setReceiptNumber(
-                "RCT-" + UUID.randomUUID().toString().toUpperCase());
+                "RCT-"
+                        + UUID.randomUUID()
+                        .toString()
+                        .toUpperCase());
 
         receipt.setRideId(payment.getRideId());
         receipt.setAmountPaid(payment.getAmount());
         receipt.setCurrency(payment.getCurrency());
-        receipt.setPaymentMethod(payment.getPaymentMethod());
+        receipt.setPaymentMethod(
+                payment.getPaymentMethod());
 
-        receipt.setActualDistanceKm(finalFare.getActualDistanceKm());
-        receipt.setActualDurationMinutes(finalFare.getActualDurationMinutes());
-        receipt.setBaseFare(finalFare.getBaseFare());
-        receipt.setDistanceCharge(finalFare.getDistanceCharge());
-        receipt.setDurationCharge(finalFare.getDurationCharge());
+        receipt.setActualDistanceKm(
+                finalFare.getActualDistanceKm());
+
+        receipt.setActualDurationMinutes(
+                finalFare.getActualDurationMinutes());
+
+        receipt.setBaseFare(
+                finalFare.getBaseFare());
+
+        receipt.setDistanceCharge(
+                finalFare.getDistanceCharge());
+
+        receipt.setDurationCharge(
+                finalFare.getDurationCharge());
 
         receipt.setIssuedAt(issuedAt);
 
         return receipt;
     }
 
-    private PaymentResponse toResponse(Payment payment) {
+    private PaymentResponse toResponse(
+            Payment payment) {
 
-        PaymentResponse response = new PaymentResponse();
+        PaymentResponse response =
+                new PaymentResponse();
 
-        response.setPaymentId(payment.getId());
-        response.setRideId(payment.getRideId());
-        response.setFinalFareId(payment.getFinalFareId());
-        response.setAmount(payment.getAmount());
-        response.setCurrency(payment.getCurrency());
-        response.setPaymentMethod(payment.getPaymentMethod());
-        response.setStatus(payment.getStatus());
-        response.setAttemptCount(payment.getAttemptCount());
-        response.setCreatedAt(payment.getCreatedAt());
-        response.setUpdatedAt(payment.getUpdatedAt());
-        response.setPaidAt(payment.getPaidAt());
+        response.setPaymentId(
+                payment.getId());
+
+        response.setRideId(
+                payment.getRideId());
+
+        response.setFinalFareId(
+                payment.getFinalFareId());
+
+        response.setAmount(
+                payment.getAmount());
+
+        response.setCurrency(
+                payment.getCurrency());
+
+        response.setPaymentMethod(
+                payment.getPaymentMethod());
+
+        response.setStatus(
+                payment.getStatus());
+
+        response.setAttemptCount(
+                payment.getAttemptCount());
+
+        response.setCreatedAt(
+                payment.getCreatedAt());
+
+        response.setUpdatedAt(
+                payment.getUpdatedAt());
+
+        response.setPaidAt(
+                payment.getPaidAt());
 
         return response;
     }
 
-    private ReceiptResponse toReceiptResponse(Payment payment) {
+    private ReceiptResponse toReceiptResponse(
+            Payment payment) {
 
-        Receipt receipt = payment.getReceipt();
+        Receipt receipt =
+                payment.getReceipt();
 
-        ReceiptResponse response = new ReceiptResponse();
+        ReceiptResponse response =
+                new ReceiptResponse();
 
-        response.setReceiptNumber(receipt.getReceiptNumber());
-        response.setPaymentId(payment.getId());
-        response.setRideId(receipt.getRideId());
-        response.setAmountPaid(receipt.getAmountPaid());
-        response.setCurrency(receipt.getCurrency());
-        response.setPaymentMethod(receipt.getPaymentMethod());
-        response.setActualDistanceKm(receipt.getActualDistanceKm());
-        response.setActualDurationMinutes(receipt.getActualDurationMinutes());
-        response.setBaseFare(receipt.getBaseFare());
-        response.setDistanceCharge(receipt.getDistanceCharge());
-        response.setDurationCharge(receipt.getDurationCharge());
-        response.setIssuedAt(receipt.getIssuedAt());
+        response.setReceiptNumber(
+                receipt.getReceiptNumber());
+
+        response.setPaymentId(
+                payment.getId());
+
+        response.setRideId(
+                receipt.getRideId());
+
+        response.setAmountPaid(
+                receipt.getAmountPaid());
+
+        response.setCurrency(
+                receipt.getCurrency());
+
+        response.setPaymentMethod(
+                receipt.getPaymentMethod());
+
+        response.setActualDistanceKm(
+                receipt.getActualDistanceKm());
+
+        response.setActualDurationMinutes(
+                receipt.getActualDurationMinutes());
+
+        response.setBaseFare(
+                receipt.getBaseFare());
+
+        response.setDistanceCharge(
+                receipt.getDistanceCharge());
+
+        response.setDurationCharge(
+                receipt.getDurationCharge());
+
+        response.setIssuedAt(
+                receipt.getIssuedAt());
 
         return response;
     }

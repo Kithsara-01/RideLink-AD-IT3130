@@ -84,11 +84,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/fares/rides/*/finalize")
-                        .hasAnyRole(
-                                "RIDER",
-                                "DRIVER",
-                                "ADMIN",
-                                "INTERNAL_RIDE_SERVICE")
+                        .hasRole("INTERNAL_RIDE_SERVICE")
 
                         .requestMatchers(
                                 "/api/fares/rides/**")

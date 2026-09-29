@@ -84,6 +84,24 @@ public class GlobalExceptionHandler {
                 ex.getMessage());
     }
 
+    @ExceptionHandler(PaymentAccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handlePaymentAccessDenied(
+            PaymentAccessDeniedException ex) {
+
+        return buildResponse(
+                HttpStatus.FORBIDDEN,
+                ex.getMessage());
+    }
+
+    @ExceptionHandler(RideServiceException.class)
+    public ResponseEntity<Map<String, Object>> handleRideServiceException(
+            RideServiceException ex) {
+
+        return buildResponse(
+                ex.getStatus(),
+                ex.getMessage());
+    }
+
     private ResponseEntity<Map<String, Object>> buildResponse(
             HttpStatus status,
             String message) {

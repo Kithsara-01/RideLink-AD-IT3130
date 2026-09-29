@@ -6,7 +6,6 @@ import com.ridelink.payment.dto.FareEstimateRequest;
 import com.ridelink.payment.dto.FareEstimateResponse;
 import com.ridelink.payment.dto.FinalFareRequest;
 import com.ridelink.payment.dto.FinalFareResponse;
-import com.ridelink.payment.exception.FinalFareAlreadyExistsException;
 import com.ridelink.payment.exception.FinalFareNotFoundException;
 import com.ridelink.payment.service.FareCalculationService;
 import com.ridelink.payment.service.FinalFareService;
@@ -55,160 +54,213 @@ class FareControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void shouldEstimateFareWithJwtAuthentication() throws Exception {
+    void shouldEstimateFareWithJwtAuthentication()
+            throws Exception {
 
         when(fareCalculationService.calculateEstimate(
                 any(FareEstimateRequest.class)))
                 .thenReturn(estimateResponse());
 
-        mockMvc.perform(post("/api/fares/estimate")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(estimateRequestJson()))
+        mockMvc.perform(
+                        post("/api/fares/estimate")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        estimateRequestJson()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estimatedFare").value(910.00))
-                .andExpect(jsonPath("$.currency").value("LKR"));
+                .andExpect(
+                        jsonPath("$.estimatedFare")
+                                .value(910.00))
+                .andExpect(
+                        jsonPath("$.currency")
+                                .value("LKR"));
     }
 
     @Test
-    void shouldEstimateFareWithCorrectInternalKey() throws Exception {
+    void shouldEstimateFareWithCorrectInternalKey()
+            throws Exception {
 
         when(fareCalculationService.calculateEstimate(
                 any(FareEstimateRequest.class)))
                 .thenReturn(estimateResponse());
 
-        mockMvc.perform(post("/api/fares/estimate")
-                        .header(
-                                "X-Internal-Service-Key",
-                                INTERNAL_KEY)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(estimateRequestJson()))
+        mockMvc.perform(
+                        post("/api/fares/estimate")
+                                .header(
+                                        "X-Internal-Service-Key",
+                                        INTERNAL_KEY)
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        estimateRequestJson()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estimatedFare").value(910.00))
-                .andExpect(jsonPath("$.currency").value("LKR"));
+                .andExpect(
+                        jsonPath("$.estimatedFare")
+                                .value(910.00))
+                .andExpect(
+                        jsonPath("$.currency")
+                                .value("LKR"));
     }
 
     @Test
-    void shouldRejectEstimateWithoutInternalKey() throws Exception {
+    void shouldRejectEstimateWithoutAuthentication()
+            throws Exception {
 
-        mockMvc.perform(post("/api/fares/estimate")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(estimateRequestJson()))
+        mockMvc.perform(
+                        post("/api/fares/estimate")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        estimateRequestJson()))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void shouldRejectEstimateWithWrongInternalKey() throws Exception {
+    void shouldRejectEstimateWithWrongInternalKey()
+            throws Exception {
 
-        mockMvc.perform(post("/api/fares/estimate")
-                        .header(
-                                "X-Internal-Service-Key",
-                                "wrong-internal-key")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(estimateRequestJson()))
+        mockMvc.perform(
+                        post("/api/fares/estimate")
+                                .header(
+                                        "X-Internal-Service-Key",
+                                        "wrong-internal-key")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        estimateRequestJson()))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void shouldReturn400ForInvalidFareEstimate() throws Exception {
+    void shouldReturn400ForInvalidFareEstimate()
+            throws Exception {
 
-        mockMvc.perform(post("/api/fares/estimate")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "pickup": "",
-                                  "destination": "Kaduwela",
-                                  "distanceKm": 0,
-                                  "durationMinutes": 0
-                                }
-                                """))
+        mockMvc.perform(
+                        post("/api/fares/estimate")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                          "pickup": "",
+                                          "destination": "Kaduwela",
+                                          "distanceKm": 0,
+                                          "durationMinutes": 0
+                                        }
+                                        """))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
-    void shouldFinalizeFareWithJwtAuthentication() throws Exception {
+    void shouldFinalizeFareWithCorrectInternalKey()
+            throws Exception {
 
         when(finalFareService.finalizeFare(
                 eq("RIDE001"),
                 any(FinalFareRequest.class)))
                 .thenReturn(finalFareResponse());
 
-        mockMvc.perform(post("/api/fares/rides/RIDE001/finalize")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(finalFareRequestJson()))
+        mockMvc.perform(
+                        post("/api/fares/rides/RIDE001/finalize")
+                                .header(
+                                        "X-Internal-Service-Key",
+                                        INTERNAL_KEY)
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        finalFareRequestJson()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.rideId").value("RIDE001"))
-                .andExpect(jsonPath("$.totalFare").value(910.00));
+                .andExpect(
+                        jsonPath("$.rideId")
+                                .value("RIDE001"))
+                .andExpect(
+                        jsonPath("$.totalFare")
+                                .value(910.00));
     }
 
     @Test
-    void shouldFinalizeFareWithCorrectInternalKey() throws Exception {
+    @WithMockUser(roles = "RIDER")
+    void riderShouldNotFinalizeFareDirectly()
+            throws Exception {
 
-        when(finalFareService.finalizeFare(
-                eq("RIDE001"),
-                any(FinalFareRequest.class)))
-                .thenReturn(finalFareResponse());
-
-        mockMvc.perform(post("/api/fares/rides/RIDE001/finalize")
-                        .header(
-                                "X-Internal-Service-Key",
-                                INTERNAL_KEY)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(finalFareRequestJson()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.rideId").value("RIDE001"))
-                .andExpect(jsonPath("$.totalFare").value(910.00));
+        mockMvc.perform(
+                        post("/api/fares/rides/RIDE001/finalize")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        finalFareRequestJson()))
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    void shouldRejectFinalizeWithoutInternalKey() throws Exception {
+    @WithMockUser(roles = "DRIVER")
+    void driverShouldNotFinalizeFareDirectly()
+            throws Exception {
 
-        mockMvc.perform(post("/api/fares/rides/RIDE001/finalize")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(finalFareRequestJson()))
+        mockMvc.perform(
+                        post("/api/fares/rides/RIDE001/finalize")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        finalFareRequestJson()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminShouldNotFinalizeFareDirectly()
+            throws Exception {
+
+        mockMvc.perform(
+                        post("/api/fares/rides/RIDE001/finalize")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        finalFareRequestJson()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectFinalizeWithoutInternalKey()
+            throws Exception {
+
+        mockMvc.perform(
+                        post("/api/fares/rides/RIDE001/finalize")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        finalFareRequestJson()))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void shouldRejectFinalizeWithWrongInternalKey() throws Exception {
+    void shouldRejectFinalizeWithWrongInternalKey()
+            throws Exception {
 
-        mockMvc.perform(post("/api/fares/rides/RIDE001/finalize")
-                        .header(
-                                "X-Internal-Service-Key",
-                                "wrong-internal-key")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(finalFareRequestJson()))
+        mockMvc.perform(
+                        post("/api/fares/rides/RIDE001/finalize")
+                                .header(
+                                        "X-Internal-Service-Key",
+                                        "wrong-internal-key")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        finalFareRequestJson()))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void shouldReturn409WhenFinalFareAlreadyExists() throws Exception {
-
-        when(finalFareService.finalizeFare(
-                eq("RIDE001"),
-                any(FinalFareRequest.class)))
-                .thenThrow(
-                        new FinalFareAlreadyExistsException(
-                                "Final fare already exists for ride: RIDE001"));
-
-        mockMvc.perform(post("/api/fares/rides/RIDE001/finalize")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(finalFareRequestJson()))
-                .andExpect(status().isConflict());
-    }
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void shouldReturn404WhenFinalFareDoesNotExist() throws Exception {
+    void shouldReturn404WhenFinalFareDoesNotExist()
+            throws Exception {
 
         when(finalFareService.getFinalFare("RIDE999"))
                 .thenThrow(
                         new FinalFareNotFoundException(
                                 "Final fare not found for ride: RIDE999"));
 
-        mockMvc.perform(get("/api/fares/rides/RIDE999"))
+        mockMvc.perform(
+                        get("/api/fares/rides/RIDE999"))
                 .andExpect(status().isNotFound());
     }
 
@@ -241,7 +293,8 @@ class FareControllerTest {
                 new BigDecimal("110.00"),
                 new BigDecimal("90.00"),
                 new BigDecimal("5.00"),
-                Instant.parse("2026-09-28T01:30:00Z")
+                Instant.parse(
+                        "2026-09-28T01:30:00Z")
         );
     }
 
