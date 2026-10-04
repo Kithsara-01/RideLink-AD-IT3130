@@ -1,0 +1,56 @@
+﻿name: RideLink CI
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+      - chore/final-submission
+  pull_request:
+    branches:
+      - develop
+      - main
+
+jobs:
+  test:
+    name: Test ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Account Service
+            service: account-service
+            java: '25'
+          - name: Driver and Vehicle Service
+            service: driver-vehicle-service
+            java: '21'
+          - name: Ride Management Service
+            service: ride-management-service
+            java: '17'
+          - name: Fare and Payment Service
+            service: fare-payment-service
+            java: '25'
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+          cache-dependency-path: ${{ matrix.service }}/pom.xml
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Run tests
+        run: ./mvnw test

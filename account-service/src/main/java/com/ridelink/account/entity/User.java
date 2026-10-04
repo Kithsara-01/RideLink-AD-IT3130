@@ -14,6 +14,8 @@ public class User {
     private String password;
     private String role;
     private boolean active;
+    private long tokenVersion = 0;
+    private String telephoneNumber;
 
     public User() {
     }
@@ -72,5 +74,21 @@ public class User {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public long getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void setTokenVersion(long tokenVersion) {
+        this.tokenVersion = tokenVersion;
+    }
+
+    public String getTelephoneNumber() {
+        return telephoneNumber;
+    }
+
+    public void setTelephoneNumber(String telephoneNumber) {
+        this.telephoneNumber = telephoneNumber;
     }
 }

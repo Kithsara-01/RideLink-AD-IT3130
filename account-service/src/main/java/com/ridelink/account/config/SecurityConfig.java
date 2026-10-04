@@ -1,5 +1,7 @@
 package com.ridelink.account.config;
 
+import com.ridelink.account.security.AccountJwtAuthenticationConverter;
+
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -8,8 +10,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -18,28 +18,14 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 public class SecurityConfig {
 
         @Bean
-        public JwtAuthenticationConverter jwtAuthenticationConverter() {
-                JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
-
-                authoritiesConverter.setAuthoritiesClaimName("role");
-                authoritiesConverter.setAuthorityPrefix("ROLE_");
-
-                JwtAuthenticationConverter authenticationConverter = new JwtAuthenticationConverter();
-
-                authenticationConverter.setJwtGrantedAuthoritiesConverter(
-                                authoritiesConverter);
-
-                return authenticationConverter;
-        }
-
-        @Bean
         public SecurityFilterChain securityFilterChain(
                         HttpSecurity http,
-                        JwtAuthenticationConverter jwtAuthenticationConverter)
+                        AccountJwtAuthenticationConverter jwtAuthenticationConverter)
                         throws Exception {
 
                 AuthenticationEntryPoint unauthorizedHandler = (request, response, exception) -> {
-                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setStatus(
+                                        HttpServletResponse.SC_UNAUTHORIZED);
                         response.setHeader("WWW-Authenticate", "Bearer");
                         response.setContentType("application/json");
                         response.setCharacterEncoding("UTF-8");
@@ -49,7 +35,8 @@ public class SecurityConfig {
                 };
 
                 AccessDeniedHandler forbiddenHandler = (request, response, exception) -> {
-                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        response.setStatus(
+                                        HttpServletResponse.SC_FORBIDDEN);
                         response.setContentType("application/json");
                         response.setCharacterEncoding("UTF-8");
                         response.getWriter().write(
@@ -61,10 +48,17 @@ public class SecurityConfig {
                                 .csrf(csrf -> csrf.disable())
 
                                 .sessionManagement(session -> session
-                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                                .sessionCreationPolicy(
+                                                                SessionCreationPolicy.STATELESS))
 
                                 .authorizeHttpRequests(auth -> auth
-                                                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                                                .dispatcherTypeMatchers(DispatcherType.ERROR)
+                                                .permitAll()
+
+                                                .requestMatchers(
+                                                                "/swagger-ui/**",
+                                                                "/v3/api-docs/**")
+                                                .permitAll()
 
                                                 .requestMatchers(
                                                                 HttpMethod.POST,
@@ -90,6 +84,11 @@ public class SecurityConfig {
                                                 .requestMatchers(
                                                                 HttpMethod.PATCH,
                                                                 "/api/accounts/*/status")
+                                                .hasRole("ADMIN")
+
+                                                .requestMatchers(
+                                                                HttpMethod.PATCH,
+                                                                "/api/accounts/*/role")
                                                 .hasRole("ADMIN")
 
                                                 .anyRequest().denyAll())
