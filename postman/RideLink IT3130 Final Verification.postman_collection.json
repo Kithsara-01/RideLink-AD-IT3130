@@ -1,0 +1,1232 @@
+{
+  "info": {
+    "_postman_id": "5827fe4e-d421-4899-a4bc-7a804f89a691",
+    "name": "RideLink IT3130 Final Verification",
+    "description": "Source-grounded final verification collection generated from the attached RideLink project. Run folders in numeric order. Sensitive runtime values are stored only in the selected local environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "51719477",
+    "_collection_link": "https://go.postman.co/collection/51719477-5827fe4e-d421-4899-a4bc-7a804f89a691?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "00 - Authentication and Accounts",
+      "item": [
+        {
+          "name": "01 - Register Fresh RIDER",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get(\"runSuffix\")) {\n  const suffix = Date.now().toString().slice(-8);\n  pm.environment.set(\"runSuffix\", suffix);\n  pm.environment.set(\"riderEmail\", `rider.${suffix}@example.com`);\n  pm.environment.set(\"driverEmail\", `driver.${suffix}@example.com`);\n  pm.environment.set(\"secondDriverEmail\", `driver2.${suffix}@example.com`);\n  pm.environment.set(\"driverLicenseNumber\", `DL-${suffix}`);\n  pm.environment.set(\"secondDriverLicenseNumber\", `D2-${suffix}`);\n  pm.environment.set(\"driverPlate\", `WP-${suffix}`);\n  pm.environment.set(\"secondDriverPlate\", `CP-${suffix}`);\n}\nconst makePassword = () => `Rl!${pm.variables.replaceIn(\"{{$randomUUID}}\").replace(/-/g, \"\").slice(0,12)}`;\nif (!pm.environment.get(\"riderPassword\")) pm.environment.set(\"riderPassword\", makePassword());\nif (!pm.environment.get(\"driverPassword\")) pm.environment.set(\"driverPassword\", makePassword());\nif (!pm.environment.get(\"secondDriverPassword\")) pm.environment.set(\"secondDriverPassword\", makePassword());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));\nconst j=pm.response.json(); pm.expect(j.role).to.eql(\"RIDER\"); pm.expect(j.active).to.eql(true); pm.environment.set(\"riderAccountId\",j.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Rider 1\",\n  \"email\": \"{{riderEmail}}\",\n  \"password\": \"{{riderPassword}}\",\n  \"role\": \"RIDER\",\n  \"telephoneNumber\": \"+94770001001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{accountBaseUrl}}/api/accounts/register",
+              "host": [
+                "{{accountBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts",
+                "register"
+              ]
+            },
+            "description": "Purpose: Create a fresh RIDER account for this verification run.\nRequired role/token: None. Public endpoint.\nRequired current state: Services running; unique generated email.\nExpected HTTP status: 201\nImportant response fields: id, email, role=RIDER, active=true\nDatabase state change: Creates account.\nREPORT EVIDENCE: Not necessary"
+          },
+          "response": []
+        },
+        {
+          "name": "02 - Login RIDER",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.role).to.eql(\"RIDER\"); pm.expect(j.accessToken).to.be.a(\"string\").and.not.empty; pm.environment.set(\"riderToken\",j.accessToken); pm.environment.set(\"riderAccountId\",j.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{riderEmail}}\",\n  \"password\": \"{{riderPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{accountBaseUrl}}/api/accounts/login",
+              "host": [
+                "{{accountBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts",
+                "login"
+              ]
+            },
+            "description": "Purpose: Authenticate the fresh RIDER and save its JWT.\nRequired role/token: None. Public endpoint.\nRequired current state: RIDER registration succeeded.\nExpected HTTP status: 200\nImportant response fields: accessToken, id, role=RIDER\nDatabase state change: No persistent business-state change.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "03 - Register Fresh DRIVER",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));\nconst j=pm.response.json(); pm.expect(j.role).to.eql(\"DRIVER\"); pm.environment.set(\"driverAccountId\",j.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Driver 1\",\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\",\n  \"role\": \"DRIVER\",\n  \"telephoneNumber\": \"+94770002002\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{accountBaseUrl}}/api/accounts/register",
+              "host": [
+                "{{accountBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts",
+                "register"
+              ]
+            },
+            "description": "Purpose: Create the DRIVER account used for assignment and lifecycle updates.\nRequired role/token: None. Public endpoint.\nRequired current state: Unique generated email.\nExpected HTTP status: 201\nImportant response fields: id, role=DRIVER\nDatabase state change: Creates account.\nREPORT EVIDENCE: Not necessary"
+          },
+          "response": []
+        },
+        {
+          "name": "04 - Login DRIVER",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.role).to.eql(\"DRIVER\"); pm.environment.set(\"driverToken\",j.accessToken); pm.environment.set(\"driverAccountId\",j.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{accountBaseUrl}}/api/accounts/login",
+              "host": [
+                "{{accountBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts",
+                "login"
+              ]
+            },
+            "description": "Purpose: Authenticate the DRIVER and save its JWT.\nRequired role/token: None. Public endpoint.\nRequired current state: DRIVER registration succeeded.\nExpected HTTP status: 200\nImportant response fields: accessToken, id, role=DRIVER\nDatabase state change: No persistent business-state change.\nREPORT EVIDENCE: Not necessary"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "01 - Driver Preparation",
+      "item": [
+        {
+          "name": "01 - Create Driver Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const j=pm.response.json(); pm.expect(j.userId).to.eql(pm.environment.get(\"driverAccountId\")); pm.expect(j.operationalStatus).to.eql(\"ACTIVE\"); pm.expect(j.availabilityStatus).to.eql(\"OFFLINE\"); pm.environment.set(\"driverProfileId\",j.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driverToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverLicenseNumber\": \"{{driverLicenseNumber}}\",\n  \"phoneNumber\": \"+94770002002\",\n  \"serviceArea\": \"Colombo\",\n  \"vehicle\": {\n    \"make\": \"Toyota\",\n    \"model\": \"Aqua\",\n    \"year\": 2022,\n    \"licensePlate\": \"{{driverPlate}}\",\n    \"color\": \"White\",\n    \"vehicleType\": \"SEDAN\",\n    \"capacity\": 4\n  },\n  \"initialLocation\": {\n    \"latitude\": 6.9271,\n    \"longitude\": 79.8612,\n    \"addressOrPlace\": \"Colombo Fort\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{driverBaseUrl}}/api/drivers",
+              "host": [
+                "{{driverBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers"
+              ]
+            },
+            "description": "Purpose: Create the Driver Profile tied automatically to the DRIVER JWT.\nRequired role/token: DRIVER / driverToken\nRequired current state: DRIVER login succeeded.\nExpected HTTP status: 201\nImportant response fields: id, userId, operationalStatus=ACTIVE, availabilityStatus=OFFLINE\nDatabase state change: Creates driver profile.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "02 - Make Driver AVAILABLE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.availabilityStatus).to.eql(\"AVAILABLE\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driverToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"AVAILABLE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{driverBaseUrl}}/api/drivers/{{driverProfileId}}/availability",
+              "host": [
+                "{{driverBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "{{driverProfileId}}",
+                "availability"
+              ]
+            },
+            "description": "Purpose: Make the active driver eligible for automatic assignment.\nRequired role/token: DRIVER / driverToken\nRequired current state: Driver Profile exists and is ACTIVE/OFFLINE.\nExpected HTTP status: 200\nImportant response fields: availabilityStatus=AVAILABLE\nDatabase state change: Updates driver availability.\nREPORT EVIDENCE: Not necessary"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Successful Ride Lifecycle",
+      "item": [
+        {
+          "name": "01 - Create Fresh Ride",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const j=pm.response.json(); pm.expect(j.status).to.eql(\"REQUESTED\"); pm.expect(j.passengerId).to.eql(pm.environment.get(\"riderAccountId\")); pm.expect(j.id).to.be.a(\"string\").and.not.empty; pm.environment.set(\"rideId\",j.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{riderToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickup\": {\n    \"place\": \"Colombo Fort\",\n    \"latitude\": 6.9271,\n    \"longitude\": 79.8612\n  },\n  \"destination\": {\n    \"place\": \"Bambalapitiya\",\n    \"latitude\": 6.8936,\n    \"longitude\": 79.855\n  },\n  \"vehicleType\": \"SEDAN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{rideBaseUrl}}/api/rides",
+              "host": [
+                "{{rideBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides"
+              ]
+            },
+            "description": "Purpose: Create a new ride and trigger the fare-estimate integration.\nRequired role/token: RIDER / riderToken\nRequired current state: RIDER logged in; Fare Service reachable.\nExpected HTTP status: 201\nImportant response fields: id, passengerId, status=REQUESTED, estimatedFare\nDatabase state change: Creates ride.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "02 - Assign Eligible Driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));\nconst j=pm.response.json(); pm.expect(j.status).to.eql(\"ASSIGNED\"); pm.expect(j.driverId).to.eql(pm.environment.get(\"driverProfileId\")); pm.environment.set(\"assignedDriverProfileId\",j.driverId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{riderToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{rideBaseUrl}}/api/rides/{{rideId}}/assign",
+              "host": [
+                "{{rideBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "assign"
+              ]
+            },
+            "description": "Purpose: Ask Ride Service to find and lock the nearest eligible matching driver.\nRequired role/token: RIDER / riderToken\nRequired current state: Ride REQUESTED; target driver ACTIVE + AVAILABLE with SEDAN.\nExpected HTTP status: 200\nImportant response fields: status=ASSIGNED, driverId\nDatabase state change: Ride becomes ASSIGNED; driver becomes BUSY.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "03 - Driver ACCEPTS Ride",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.status).to.eql(\"ACCEPTED\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driverToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACCEPTED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{rideBaseUrl}}/api/rides/{{rideId}}/status",
+              "host": [
+                "{{rideBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "status"
+              ]
+            },
+            "description": "Purpose: Assigned driver accepts the ride.\nRequired role/token: DRIVER / driverToken\nRequired current state: Ride ASSIGNED to this driver profile.\nExpected HTTP status: 200\nImportant response fields: status=ACCEPTED, acceptedAt\nDatabase state change: Updates ride lifecycle.\nREPORT EVIDENCE: Not necessary"
+          },
+          "response": []
+        },
+        {
+          "name": "04 - Start Ride",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.status).to.eql(\"IN_PROGRESS\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driverToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{rideBaseUrl}}/api/rides/{{rideId}}/status",
+              "host": [
+                "{{rideBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "status"
+              ]
+            },
+            "description": "Purpose: Assigned driver starts the accepted ride.\nRequired role/token: DRIVER / driverToken\nRequired current state: Ride ACCEPTED.\nExpected HTTP status: 200\nImportant response fields: status=IN_PROGRESS, startedAt\nDatabase state change: Updates ride lifecycle.\nREPORT EVIDENCE: Not necessary"
+          },
+          "response": []
+        },
+        {
+          "name": "05 - Complete Ride",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.status).to.eql(\"COMPLETED\"); pm.expect(j.finalFare).to.be.a(\"number\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driverToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\",\n  \"actualDistanceKm\": 12.5,\n  \"actualDurationMinutes\": 30\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{rideBaseUrl}}/api/rides/{{rideId}}/status",
+              "host": [
+                "{{rideBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "status"
+              ]
+            },
+            "description": "Purpose: Complete the ride; Ride Service finalizes fare and releases the driver.\nRequired role/token: DRIVER / driverToken\nRequired current state: Ride IN_PROGRESS; Fare and Driver services reachable.\nExpected HTTP status: 200\nImportant response fields: status=COMPLETED, finalFare, completedAt\nDatabase state change: Ride completes; FinalFare stored; driver released.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "06 - Verify Driver Released",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.availabilityStatus).to.eql(\"AVAILABLE\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driverToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{driverBaseUrl}}/api/drivers/{{driverProfileId}}",
+              "host": [
+                "{{driverBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "{{driverProfileId}}"
+              ]
+            },
+            "description": "Purpose: Confirm completion released the assigned driver for another ride.\nRequired role/token: DRIVER / driverToken\nRequired current state: Ride completion succeeded.\nExpected HTTP status: 200\nImportant response fields: availabilityStatus=AVAILABLE\nDatabase state change: Read only.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Fare Payment and Receipt",
+      "item": [
+        {
+          "name": "01 - Verify Persisted Final Fare",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.rideId).to.eql(pm.environment.get(\"rideId\")); pm.expect(j.totalFare).to.exist; pm.expect(j.currency).to.eql(\"LKR\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{riderToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{paymentBaseUrl}}/api/fares/rides/{{rideId}}",
+              "host": [
+                "{{paymentBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "fares",
+                "rides",
+                "{{rideId}}"
+              ]
+            },
+            "description": "Purpose: Read the FinalFare persisted by the completion integration.\nRequired role/token: RIDER / riderToken\nRequired current state: Ride COMPLETED and final fare stored.\nExpected HTTP status: 200\nImportant response fields: rideId, actualDistanceKm, actualDurationMinutes, totalFare, currency=LKR\nDatabase state change: Read only.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "02 - Simulate FAILED Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.status).to.eql(\"FAILED\"); pm.expect(j.paidAt).to.eql(null); pm.expect(j.attemptCount).to.eql(1); pm.environment.set(\"paymentId\",j.paymentId); pm.environment.set(\"finalFareId\",j.finalFareId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{riderToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rideId\": \"{{rideId}}\",\n  \"paymentMethod\": \"CARD\",\n  \"simulationOutcome\": \"FAILED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{paymentBaseUrl}}/api/payments",
+              "host": [
+                "{{paymentBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "description": "Purpose: Demonstrate the project simulated failed-payment behavior without real payment data.\nRequired role/token: RIDER / riderToken\nRequired current state: Ride COMPLETED; FinalFare exists; no prior payment.\nExpected HTTP status: 200\nImportant response fields: paymentId, status=FAILED, attemptCount=1, paidAt=null\nDatabase state change: Creates FAILED payment; no receipt.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "03 - Retry Payment as SUCCESS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.status).to.eql(\"SUCCESS\"); pm.expect(j.paymentId).to.eql(pm.environment.get(\"paymentId\")); pm.expect(j.attemptCount).to.eql(2); pm.expect(j.paidAt).to.not.eql(null);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{riderToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rideId\": \"{{rideId}}\",\n  \"paymentMethod\": \"CARD\",\n  \"simulationOutcome\": \"SUCCESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{paymentBaseUrl}}/api/payments",
+              "host": [
+                "{{paymentBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "description": "Purpose: Retry the existing failed simulated payment and make it successful.\nRequired role/token: RIDER / riderToken\nRequired current state: Existing FAILED payment for completed ride.\nExpected HTTP status: 200\nImportant response fields: same paymentId, status=SUCCESS, attemptCount=2, paidAt\nDatabase state change: Updates payment and creates permanent receipt.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "04 - Receipt by Payment ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.paymentId).to.eql(pm.environment.get(\"paymentId\")); pm.expect(j.rideId).to.eql(pm.environment.get(\"rideId\")); pm.expect(j.receiptNumber).to.be.a(\"string\").and.not.empty; pm.environment.set(\"receiptNumber\",j.receiptNumber);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{riderToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{paymentBaseUrl}}/api/payments/{{paymentId}}/receipt",
+              "host": [
+                "{{paymentBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{paymentId}}",
+                "receipt"
+              ]
+            },
+            "description": "Purpose: Retrieve the receipt using the successful Payment ID and save receipt number.\nRequired role/token: RIDER / riderToken\nRequired current state: Payment SUCCESS.\nExpected HTTP status: 200\nImportant response fields: receiptNumber, paymentId, rideId, amountPaid\nDatabase state change: Read only.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "05 - Receipt by Receipt Number",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j.receiptNumber).to.eql(pm.environment.get(\"receiptNumber\")); pm.expect(j.paymentId).to.eql(pm.environment.get(\"paymentId\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{riderToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{paymentBaseUrl}}/api/receipts/{{receiptNumber}}",
+              "host": [
+                "{{paymentBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "receipts",
+                "{{receiptNumber}}"
+              ]
+            },
+            "description": "Purpose: Verify permanent receipt lookup by receipt number.\nRequired role/token: RIDER / riderToken\nRequired current state: Receipt number saved from previous request.\nExpected HTTP status: 200\nImportant response fields: receiptNumber, paymentId, rideId, amountPaid\nDatabase state change: Read only.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Negative and Security Tests",
+      "item": [
+        {
+          "name": "01 - Protected Endpoint Without JWT -> 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{driverBaseUrl}}/api/drivers/{{driverProfileId}}",
+              "host": [
+                "{{driverBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "{{driverProfileId}}"
+              ]
+            },
+            "description": "Purpose: Prove a protected Driver endpoint rejects a missing JWT.\nRequired role/token: No token intentionally.\nRequired current state: driverProfileId exists.\nExpected HTTP status: 401\nImportant response fields: authentication error body\nDatabase state change: No change.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "02 - Register Second DRIVER",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const j=pm.response.json(); pm.environment.set(\"secondDriverAccountId\",j.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Postman Wrong Driver\",\n  \"email\": \"{{secondDriverEmail}}\",\n  \"password\": \"{{secondDriverPassword}}\",\n  \"role\": \"DRIVER\",\n  \"telephoneNumber\": \"+94770003003\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{accountBaseUrl}}/api/accounts/register",
+              "host": [
+                "{{accountBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts",
+                "register"
+              ]
+            },
+            "description": "Purpose: Create a different DRIVER identity for ownership testing.\nRequired role/token: None. Public endpoint.\nRequired current state: Unique generated secondDriverEmail.\nExpected HTTP status: 201\nImportant response fields: id, role=DRIVER\nDatabase state change: Creates second driver account.\nREPORT EVIDENCE: Not necessary"
+          },
+          "response": []
+        },
+        {
+          "name": "03 - Login Second DRIVER",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.environment.set(\"secondDriverToken\",j.accessToken); pm.environment.set(\"secondDriverAccountId\",j.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{secondDriverEmail}}\",\n  \"password\": \"{{secondDriverPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{accountBaseUrl}}/api/accounts/login",
+              "host": [
+                "{{accountBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "accounts",
+                "login"
+              ]
+            },
+            "description": "Purpose: Obtain JWT for the wrong-driver authorization test.\nRequired role/token: None. Public endpoint.\nRequired current state: Second DRIVER registered.\nExpected HTTP status: 200\nImportant response fields: accessToken, id\nDatabase state change: No business-state change.\nREPORT EVIDENCE: Not necessary"
+          },
+          "response": []
+        },
+        {
+          "name": "04 - Create Second Driver Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const j=pm.response.json(); pm.environment.set(\"secondDriverProfileId\",j.id); pm.expect(j.availabilityStatus).to.eql(\"OFFLINE\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{secondDriverToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverLicenseNumber\": \"{{secondDriverLicenseNumber}}\",\n  \"phoneNumber\": \"+94770003003\",\n  \"serviceArea\": \"Colombo\",\n  \"vehicle\": {\n    \"make\": \"Honda\",\n    \"model\": \"Fit\",\n    \"year\": 2021,\n    \"licensePlate\": \"{{secondDriverPlate}}\",\n    \"color\": \"Silver\",\n    \"vehicleType\": \"SEDAN\",\n    \"capacity\": 4\n  },\n  \"initialLocation\": {\n    \"latitude\": 6.9147,\n    \"longitude\": 79.8777,\n    \"addressOrPlace\": \"Colombo\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{driverBaseUrl}}/api/drivers",
+              "host": [
+                "{{driverBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "drivers"
+              ]
+            },
+            "description": "Purpose: Create the second Driver Profile; keep it OFFLINE so it cannot affect assignment.\nRequired role/token: DRIVER / secondDriverToken\nRequired current state: Second DRIVER login succeeded.\nExpected HTTP status: 201\nImportant response fields: id, availabilityStatus=OFFLINE\nDatabase state change: Creates second driver profile.\nREPORT EVIDENCE: Not necessary"
+          },
+          "response": []
+        },
+        {
+          "name": "05 - Wrong Driver Updates Ride -> 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{secondDriverToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACCEPTED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{rideBaseUrl}}/api/rides/{{rideId}}/status",
+              "host": [
+                "{{rideBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "status"
+              ]
+            },
+            "description": "Purpose: Prove a DRIVER who is not assigned to this ride cannot update it.\nRequired role/token: Different DRIVER / secondDriverToken\nRequired current state: Original ride belongs to first assigned driver; ride is already COMPLETED.\nExpected HTTP status: 403\nImportant response fields: authorization error\nDatabase state change: Must not mutate ride.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "06 - Assigned Driver Invalid Transition -> 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driverToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACCEPTED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{rideBaseUrl}}/api/rides/{{rideId}}/status",
+              "host": [
+                "{{rideBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rides",
+                "{{rideId}}",
+                "status"
+              ]
+            },
+            "description": "Purpose: Prove an authorized assigned driver still cannot make an invalid lifecycle transition.\nRequired role/token: Assigned DRIVER / driverToken\nRequired current state: Ride is COMPLETED.\nExpected HTTP status: 409\nImportant response fields: invalid transition error\nDatabase state change: Must not mutate ride.\nREPORT EVIDENCE: SAVE SCREENSHOT"
+          },
+          "response": []
+        },
+        {
+          "name": "07 - Change Successful Payment to FAILED -> 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{riderToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rideId\": \"{{rideId}}\",\n  \"paymentMethod\": \"CARD\",\n  \"simulationOutcome\": \"FAILED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{paymentBaseUrl}}/api/payments",
+              "host": [
+                "{{paymentBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "description": "Purpose: Prove a successful payment cannot later be changed to FAILED.\nRequired role/token: RIDER / riderToken\nRequired current state: Payment is already SUCCESS.\nExpected HTTP status: 409\nImportant response fields: Successful payment cannot be changed to failed\nDatabase state change: Must not mutate successful payment.\nREPORT EVIDENCE: Not necessary"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

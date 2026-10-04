@@ -9,12 +9,15 @@ import com.ridelink.driver.dto.UpdateOperationalStatusRequest;
 import com.ridelink.driver.dto.UpdateVehicleRequest;
 import com.ridelink.driver.entity.VehicleType;
 import com.ridelink.driver.service.DriverService;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
 import jakarta.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,8 +38,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/drivers")
 @Tag(
-        name = "Driver Management",
-        description = "Driver profiles, vehicle info, availability, simulated GPS location, and proximity discovery"
+        name = "Driver & Vehicle Management",
+        description = "APIs for driver profiles, vehicles, availability and location."
 )
 public class DriverController {
 
@@ -49,21 +52,46 @@ public class DriverController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(
-            summary = "Register driver profile",
-            description = "Registers an operational driver profile with vehicle and initial location details"
+            summary = "Create a Driver Profile",
+            description = """
+                    Role: DRIVER
+
+                    Before using:
+                    1. Register or login as DRIVER through Account Service.
+                    2. Copy the accessToken.
+                    3. Click Authorize and enter the token.
+
+                    Do not enter an Account/User ID in the request.
+                    The Account/User ID is obtained automatically from the JWT.
+
+                    After success, copy the response field named `id`.
+                    This is the Driver Profile ID used by the other Driver endpoints.
+                    """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
-                    description = "Driver registered successfully"
+                    description = "Driver Profile created"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Validation failed"
+                    description = "Invalid request"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "JWT is missing or invalid"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "An active DRIVER account is required"
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Duplicate user ID, license number, or vehicle plate"
+                    description = "Driver Profile, licence or vehicle plate already exists"
+            ),
+            @ApiResponse(
+                    responseCode = "503",
+                    description = "Account Service is unavailable"
             )
     })
     public ResponseEntity<DriverResponse> registerDriver(
@@ -83,20 +111,48 @@ public class DriverController {
 
     @GetMapping("/{id}")
     @Operation(
-            summary = "Get driver by ID",
-            description = "Retrieves driver operational and vehicle information by driver ID"
+            summary = "Get driver by Driver Profile ID",
+            description = """
+                    Role: RIDER, DRIVER or ADMIN
+
+                    Paste the Driver Profile ID into the id field.
+
+                    Get this value from:
+                    - POST /api/drivers response field: id
+
+                    Database reference:
+                    - Database: ridelink_driver_vehicle_service
+                    - Collection: drivers
+                    - Field: _id
+                    """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Driver retrieved successfully"
+                    description = "Driver Profile returned"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "JWT is missing or invalid"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Role is not allowed"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Driver not found"
+                    description = "Driver Profile not found"
             )
     })
     public ResponseEntity<DriverResponse> getDriverById(
+            @Parameter(
+                    description = """
+                            Paste the Driver Profile ID here.
+                            Source: POST /api/drivers response field `id`.
+                            MongoDB: ridelink_driver_vehicle_service > drivers > _id.
+                            """,
+                    required = true
+            )
             @PathVariable String id) {
 
         return ResponseEntity.ok(
@@ -106,20 +162,50 @@ public class DriverController {
 
     @GetMapping("/user/{userId}")
     @Operation(
-            summary = "Get driver by User ID",
-            description = "Retrieves driver profile linked to an account service User ID"
+            summary = "Get driver by Account/User ID",
+            description = """
+                    Role: RIDER, DRIVER or ADMIN
+
+                    Paste an Account/User ID into the userId field.
+
+                    Get this value from:
+                    - Account Service registration response field: id
+                    - Account Service login response field: id
+                    - GET /api/accounts/me response field: id
+
+                    Database reference:
+                    - Database: ridelink_account_service
+                    - Collection: users
+                    - Field: _id
+                    """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Driver retrieved successfully"
+                    description = "Driver Profile returned"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "JWT is missing or invalid"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Role is not allowed"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Driver not found for user ID"
+                    description = "Driver Profile not found"
             )
     })
     public ResponseEntity<DriverResponse> getDriverByUserId(
+            @Parameter(
+                    description = """
+                            Paste the Account/User ID here.
+                            Source: Account Service register, login or /me response field `id`.
+                            MongoDB: ridelink_account_service > users > _id.
+                            """,
+                    required = true
+            )
             @PathVariable String userId) {
 
         return ResponseEntity.ok(
@@ -130,27 +216,54 @@ public class DriverController {
     @PutMapping("/{id}/vehicle")
     @Operation(
             summary = "Update vehicle details",
-            description = "Updates vehicle attributes such as make, model, plate, or capacity"
+            description = """
+                    Role: DRIVER or ADMIN
+
+                    Paste the Driver Profile ID into the id field.
+                    Provide the complete new vehicle details.
+
+                    Supported vehicle types:
+                    - SEDAN
+                    - SUV
+                    - VAN
+                    - TUK
+                    """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Vehicle updated successfully"
+                    description = "Vehicle updated"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Validation failed"
+                    description = "Invalid request"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "JWT is missing or invalid"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Role is not allowed"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Driver not found"
+                    description = "Driver Profile not found"
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "License plate already registered to another vehicle"
+                    description = "Vehicle plate already exists"
             )
     })
     public ResponseEntity<DriverResponse> updateVehicle(
+            @Parameter(
+                    description = """
+                            Paste the Driver Profile ID here.
+                            Source: POST /api/drivers response field `id`.
+                            MongoDB: ridelink_driver_vehicle_service > drivers > _id.
+                            """,
+                    required = true
+            )
             @PathVariable String id,
             @Valid @RequestBody UpdateVehicleRequest request) {
 
@@ -164,32 +277,51 @@ public class DriverController {
 
     @PatchMapping("/{id}/availability")
     @Operation(
-            summary = "Update availability status",
-            description = "Driver toggles availability between AVAILABLE, OFFLINE, and BUSY"
+            summary = "Update driver availability",
+            description = """
+                    Role: DRIVER or ADMIN
+
+                    Availability values:
+                    - AVAILABLE: ready for a new ride
+                    - BUSY: currently assigned to a ride
+                    - OFFLINE: not accepting rides
+                    """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Availability updated successfully"
+                    description = "Availability updated"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Validation failed"
+                    description = "Invalid request"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "JWT is missing or invalid"
             ),
             @ApiResponse(
                     responseCode = "403",
-                    description = "Suspended driver cannot set availability to AVAILABLE"
+                    description = "Role or driver status is not allowed"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Driver not found"
+                    description = "Driver Profile not found"
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Cannot go OFFLINE while in an active ride"
+                    description = "Invalid availability change"
             )
     })
     public ResponseEntity<DriverResponse> updateAvailability(
+            @Parameter(
+                    description = """
+                            Paste the Driver Profile ID here.
+                            Source: POST /api/drivers response field `id`.
+                            MongoDB: ridelink_driver_vehicle_service > drivers > _id.
+                            """,
+                    required = true
+            )
             @PathVariable String id,
             @Valid @RequestBody UpdateAvailabilityRequest request) {
 
@@ -203,24 +335,45 @@ public class DriverController {
 
     @PatchMapping("/{id}/location")
     @Operation(
-            summary = "Update simulated GPS location",
-            description = "Updates driver simulated latitude, longitude, and optional service area"
+            summary = "Update driver location",
+            description = """
+                    Role: DRIVER or ADMIN
+
+                    Paste the Driver Profile ID into the id field.
+                    Enter the driver's simulated location details.
+                    """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Location updated successfully"
+                    description = "Location updated"
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid coordinate bounds"
+                    description = "Invalid location"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "JWT is missing or invalid"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Role is not allowed"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Driver not found"
+                    description = "Driver Profile not found"
             )
     })
     public ResponseEntity<DriverResponse> updateLocation(
+            @Parameter(
+                    description = """
+                            Paste the Driver Profile ID here.
+                            Source: POST /api/drivers response field `id`.
+                            MongoDB: ridelink_driver_vehicle_service > drivers > _id.
+                            """,
+                    required = true
+            )
             @PathVariable String id,
             @Valid @RequestBody UpdateLocationRequest request) {
 
@@ -234,43 +387,63 @@ public class DriverController {
 
     @GetMapping("/available")
     @Operation(
-            summary = "Find eligible available drivers",
-            description = "Interservice query for Ride Management Service to discover nearby available drivers matching area, vehicle type, and pickup coordinates"
+            summary = "Internal: Find available drivers",
+            description = """
+                    Called automatically by Ride Management Service.
+
+                    Finds drivers who are ACTIVE and AVAILABLE.
+                    Normal DRIVER or RIDER users should not execute this endpoint.
+
+                    Demonstrate this feature through Ride Service driver assignment.
+                    """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Available drivers retrieved successfully (empty list if none found)"
+                    description = "Available drivers returned"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Authentication is missing or invalid"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Caller is not allowed"
             )
     })
     public ResponseEntity<List<AvailableDriverResponse>>
             findAvailableDrivers(
                     @Parameter(
-                            description = "Optional service area filter"
+                            description = "Enter the service area, for example Colombo",
+                            example = "Colombo"
                     )
                     @RequestParam(required = false)
                     String serviceArea,
 
                     @Parameter(
-                            description = "Optional vehicle type filter (SEDAN, SUV, VAN, TUK)"
+                            description = "Select the required vehicle type",
+                            example = "SEDAN"
                     )
                     @RequestParam(required = false)
                     VehicleType vehicleType,
 
                     @Parameter(
-                            description = "Pickup latitude for proximity calculation"
+                            description = "Enter the pickup latitude",
+                            example = "6.9271"
                     )
                     @RequestParam(required = false)
                     Double pickupLat,
 
                     @Parameter(
-                            description = "Pickup longitude for proximity calculation"
+                            description = "Enter the pickup longitude",
+                            example = "79.8612"
                     )
                     @RequestParam(required = false)
                     Double pickupLng,
 
                     @Parameter(
-                            description = "Search radius in km (default 15.0)"
+                            description = "Enter the search radius in kilometres",
+                            example = "15.0"
                     )
                     @RequestParam(required = false)
                     Double radiusKm) {
@@ -291,28 +464,45 @@ public class DriverController {
 
     @PatchMapping("/{id}/assign")
     @Operation(
-            summary = "Interservice Lock: Assign driver to ride",
-            description = "Transitions driver from AVAILABLE to BUSY when ride request is assigned or accepted"
+            summary = "Internal: Assign driver",
+            description = """
+                    Called automatically by Ride Management Service.
+
+                    Changes an AVAILABLE driver to BUSY.
+                    Demonstrate this through Ride Service ride assignment.
+                    """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Driver assigned successfully and marked BUSY"
+                    description = "Driver assigned and marked BUSY"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Authentication is missing or invalid"
             ),
             @ApiResponse(
                     responseCode = "403",
-                    description = "Cannot assign suspended driver"
+                    description = "Caller or driver status is not allowed"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Driver not found"
+                    description = "Driver Profile not found"
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Driver is already BUSY or OFFLINE"
+                    description = "Driver is not AVAILABLE"
             )
     })
     public ResponseEntity<DriverResponse> assignDriver(
+            @Parameter(
+                    description = """
+                            Paste the Driver Profile ID here.
+                            Source: Ride assignment selection or POST /api/drivers response field `id`.
+                            MongoDB: ridelink_driver_vehicle_service > drivers > _id.
+                            """,
+                    required = true
+            )
             @PathVariable String id) {
 
         return ResponseEntity.ok(
@@ -322,21 +512,57 @@ public class DriverController {
 
     @PatchMapping("/{id}/release")
     @Operation(
-            summary = "Interservice Release: Free driver after ride ends",
-            description = "Transitions driver from BUSY back to AVAILABLE. Completed rides increase the completed ride count, while cancelled rides do not."
+            summary = "Internal: Release driver",
+            description = """
+                    Called automatically by Ride Management Service.
+
+                    completed=true:
+                    - completed ride
+                    - driver becomes AVAILABLE
+                    - totalRidesCompleted increases
+
+                    completed=false:
+                    - cancelled ride
+                    - driver becomes AVAILABLE
+                    - completed count does not increase
+                    """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Driver released successfully and marked AVAILABLE"
+                    description = "Driver released and marked AVAILABLE"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Authentication is missing or invalid"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Caller is not allowed"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Driver not found"
+                    description = "Driver Profile not found"
             )
     })
     public ResponseEntity<DriverResponse> releaseDriver(
+            @Parameter(
+                    description = """
+                            Paste the assigned Driver Profile ID here.
+                            Source: Ride response field `driverId`.
+                            MongoDB: ridelink_driver_vehicle_service > drivers > _id.
+                            """,
+                    required = true
+            )
             @PathVariable String id,
+
+            @Parameter(
+                    description = """
+                            Select true for a completed ride.
+                            Select false for a cancelled ride.
+                            """,
+                    example = "true"
+            )
             @RequestParam(defaultValue = "true")
             boolean completed) {
 
@@ -350,20 +576,50 @@ public class DriverController {
 
     @PatchMapping("/{id}/status")
     @Operation(
-            summary = "Administrative: Update operational status",
-            description = "Admin endpoint to set driver operational status to ACTIVE or SUSPENDED"
+            summary = "Update operational status",
+            description = """
+                    Role: DRIVER or ADMIN
+                    Recommended demo role: ADMIN
+
+                    Operational status values:
+                    - ACTIVE
+                    - SUSPENDED
+                    - PENDING_VERIFICATION
+
+                    Setting SUSPENDED also changes availability to OFFLINE.
+                    """
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Operational status updated successfully"
+                    description = "Operational status updated"
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid request"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "JWT is missing or invalid"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Role is not allowed"
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Driver not found"
+                    description = "Driver Profile not found"
             )
     })
     public ResponseEntity<DriverResponse> updateOperationalStatus(
+            @Parameter(
+                    description = """
+                            Paste the Driver Profile ID here.
+                            Source: POST /api/drivers response field `id`.
+                            MongoDB: ridelink_driver_vehicle_service > drivers > _id.
+                            """,
+                    required = true
+            )
             @PathVariable String id,
             @Valid @RequestBody UpdateOperationalStatusRequest request) {
 

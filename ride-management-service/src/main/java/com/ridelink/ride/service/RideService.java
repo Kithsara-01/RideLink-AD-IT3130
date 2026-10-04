@@ -6,6 +6,7 @@ import com.ridelink.ride.client.FareClient;
 import com.ridelink.ride.dto.AccountResponse;
 import com.ridelink.ride.dto.AvailableDriverResponse;
 import com.ridelink.ride.dto.CreateRideRequest;
+import com.ridelink.ride.dto.DriverProfileResponse;
 import com.ridelink.ride.dto.FareEstimateRequest;
 import com.ridelink.ride.dto.FareEstimateResponse;
 import com.ridelink.ride.dto.FinalFareRequest;
@@ -89,8 +90,7 @@ public class RideService {
                                 destination));
 
         int durationMinutes =
-                estimateDurationMinutes(
-                        distanceKm);
+                estimateDurationMinutes(distanceKm);
 
         FareEstimateRequest fareRequest =
                 new FareEstimateRequest(
@@ -100,26 +100,21 @@ public class RideService {
                         durationMinutes);
 
         FareEstimateResponse fareResponse =
-                fareClient.estimateFare(
-                        fareRequest);
+                fareClient.estimateFare(fareRequest);
 
         Ride ride = new Ride(
                 account.getId().trim(),
                 pickup,
                 destination,
                 request.getVehicleType(),
-                fareResponse
-                        .estimatedFare()
-                        .doubleValue());
+                fareResponse.estimatedFare().doubleValue());
 
         return RideResponse.fromEntity(
                 rideRepository.save(ride));
     }
 
     public RideResponse getRide(String id) {
-
-        return RideResponse.fromEntity(
-                findRide(id));
+        return RideResponse.fromEntity(findRide(id));
     }
 
     public List<RideResponse> getPassengerRides(
@@ -157,11 +152,9 @@ public class RideService {
                         null,
                         ride.getVehicleType(),
                         ride.getPickup().getLatitude(),
-                        ride.getPickup().getLongitude()
-                );
+                        ride.getPickup().getLongitude());
 
         if (drivers == null || drivers.isEmpty()) {
-
             throw new ApiException(
                     HttpStatus.CONFLICT,
                     "No available driver matches this ride request");
@@ -178,14 +171,10 @@ public class RideService {
                     "Driver service returned an invalid driver ID");
         }
 
-        driverClient.assignDriver(
-                driverId);
+        driverClient.assignDriver(driverId);
 
-        ride.setDriverId(
-                driverId);
-
-        ride.setStatus(
-                RideStatus.ASSIGNED);
+        ride.setDriverId(driverId);
+        ride.setStatus(RideStatus.ASSIGNED);
 
         touch(ride);
 
@@ -195,16 +184,25 @@ public class RideService {
 
     public RideResponse updateStatus(
             String id,
-            UpdateRideStatusRequest request) {
+            UpdateRideStatusRequest request,
+            String accountId,
+            String role,
+            String bearerToken) {
 
-        Ride ride =
-                findRide(id);
+        Ride ride = findRide(id);
 
         RideStatus current =
                 ride.getStatus();
 
         RideStatus target =
                 request.getStatus();
+
+        authorizeStatusUpdate(
+                ride,
+                target,
+                accountId,
+                role,
+                bearerToken);
 
         if (!allowedTransitions(current)
                 .contains(target)) {
@@ -220,8 +218,7 @@ public class RideService {
         if (target == RideStatus.CANCELLED) {
 
             if (request.getCancellationReason() == null
-                    || request.getCancellationReason()
-                            .isBlank()) {
+                    || request.getCancellationReason().isBlank()) {
 
                 throw new ApiException(
                         HttpStatus.BAD_REQUEST,
@@ -229,14 +226,11 @@ public class RideService {
             }
 
             ride.setCancellationReason(
-                    request.getCancellationReason()
-                            .trim());
+                    request.getCancellationReason().trim());
 
-            ride.setCancelledAt(
-                    Instant.now());
+            ride.setCancelledAt(Instant.now());
 
             if (ride.getDriverId() != null) {
-
                 driverClient.releaseDriver(
                         ride.getDriverId(),
                         false);
@@ -244,18 +238,15 @@ public class RideService {
 
         } else if (target == RideStatus.ACCEPTED) {
 
-            ride.setAcceptedAt(
-                    Instant.now());
+            ride.setAcceptedAt(Instant.now());
 
         } else if (target == RideStatus.IN_PROGRESS) {
 
-            ride.setStartedAt(
-                    Instant.now());
+            ride.setStartedAt(Instant.now());
 
         } else if (target == RideStatus.COMPLETED) {
 
-            validateCompletionDetails(
-                    request);
+            validateCompletionDetails(request);
 
             FinalFareRequest finalFareRequest =
                     new FinalFareRequest(
@@ -268,81 +259,141 @@ public class RideService {
                             finalFareRequest);
 
             ride.setFinalFare(
-                    finalFareResponse
-                            .totalFare()
-                            .doubleValue());
+                    finalFareResponse.totalFare().doubleValue());
 
-            ride.setCompletedAt(
-                    Instant.now());
+            ride.setCompletedAt(Instant.now());
 
             if (ride.getDriverId() != null) {
-
                 driverClient.releaseDriver(
                         ride.getDriverId(),
                         true);
             }
         }
 
-        ride.setStatus(
-                target);
-
+        ride.setStatus(target);
         touch(ride);
 
         return RideResponse.fromEntity(
                 rideRepository.save(ride));
     }
 
+    private void authorizeStatusUpdate(
+            Ride ride,
+            RideStatus target,
+            String accountId,
+            String role,
+            String bearerToken) {
+
+        if ("ADMIN".equals(role)) {
+            return;
+        }
+
+        if ("RIDER".equals(role)) {
+
+            boolean ownsRide =
+                    accountId != null
+                            && accountId.equals(
+                                    ride.getPassengerId());
+
+            if (!ownsRide
+                    || target != RideStatus.CANCELLED) {
+
+                throw new ApiException(
+                        HttpStatus.FORBIDDEN,
+                        "You are not allowed to update this ride");
+            }
+
+            return;
+        }
+
+        if ("DRIVER".equals(role)) {
+
+            boolean isDriverLifecycleAction =
+                    target == RideStatus.ACCEPTED
+                            || target == RideStatus.IN_PROGRESS
+                            || target == RideStatus.COMPLETED;
+
+            if (!isDriverLifecycleAction) {
+                throw new ApiException(
+                        HttpStatus.FORBIDDEN,
+                        "You are not allowed to update this ride");
+            }
+
+            if (accountId == null
+                    || accountId.isBlank()) {
+
+                throw new ApiException(
+                        HttpStatus.FORBIDDEN,
+                        "Driver identity could not be verified");
+            }
+
+            DriverProfileResponse driver =
+                    driverClient.getDriverByUserId(
+                            accountId,
+                            bearerToken);
+
+            boolean ownsAssignedRide =
+                    ride.getDriverId() != null
+                            && ride.getDriverId().equals(
+                                    driver.id());
+
+            if (!ownsAssignedRide) {
+                throw new ApiException(
+                        HttpStatus.FORBIDDEN,
+                        "You are not allowed to update this ride");
+            }
+
+            return;
+        }
+
+        throw new ApiException(
+                HttpStatus.FORBIDDEN,
+                "You are not allowed to update this ride");
+    }
+
     private void validateCompletionDetails(
             UpdateRideStatusRequest request) {
 
         if (request.getActualDistanceKm() == null) {
-
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
                     "Actual distance is required when completing a ride");
         }
 
         if (request.getActualDistanceKm() < 0.1) {
-
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
                     "Actual distance must be at least 0.1 km");
         }
 
         if (request.getActualDurationMinutes() == null) {
-
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
                     "Actual duration is required when completing a ride");
         }
 
         if (request.getActualDurationMinutes() < 1) {
-
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
                     "Actual duration must be at least 1 minute");
         }
     }
 
-    private Ride findRide(
-            String id) {
+    private Ride findRide(String id) {
 
         return rideRepository
                 .findById(id)
                 .orElseThrow(() ->
                         new ApiException(
                                 HttpStatus.NOT_FOUND,
-                                "Ride not found with ID: "
-                                        + id));
+                                "Ride not found with ID: " + id));
     }
 
     private void requireStatus(
             Ride ride,
             RideStatus expected) {
 
-        if (ride.getStatus()
-                != expected) {
-
+        if (ride.getStatus() != expected) {
             throw new ApiException(
                     HttpStatus.CONFLICT,
                     "Ride must be in "
@@ -391,11 +442,8 @@ public class RideService {
                 request.getLongitude());
     }
 
-    private void touch(
-            Ride ride) {
-
-        ride.setUpdatedAt(
-                Instant.now());
+    private void touch(Ride ride) {
+        ride.setUpdatedAt(Instant.now());
     }
 
     private double distanceInKm(
@@ -416,27 +464,24 @@ public class RideService {
                 Math.sin(latDistance / 2)
                         * Math.sin(latDistance / 2)
                         + Math.cos(
-                        Math.toRadians(
-                                from.getLatitude()))
+                        Math.toRadians(from.getLatitude()))
                         * Math.cos(
-                        Math.toRadians(
-                                to.getLatitude()))
+                        Math.toRadians(to.getLatitude()))
                         * Math.sin(lonDistance / 2)
                         * Math.sin(lonDistance / 2);
 
         return 6371.0
                 * 2
                 * Math.atan2(
-                Math.sqrt(a),
-                Math.sqrt(1 - a));
+                        Math.sqrt(a),
+                        Math.sqrt(1 - a));
     }
 
     private double roundDistance(
             double distanceKm) {
 
         return Math.round(
-                distanceKm * 100.0)
-                / 100.0;
+                distanceKm * 100.0) / 100.0;
     }
 
     private int estimateDurationMinutes(

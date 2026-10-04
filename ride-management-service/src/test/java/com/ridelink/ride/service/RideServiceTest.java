@@ -521,7 +521,10 @@ class RideServiceTest {
         var response =
                 rideService.updateStatus(
                         "ride-1",
-                        request);
+                        request,
+                        "test-admin",
+                        "ADMIN",
+                        "test-token");
 
         assertThat(response.getStatus())
                 .isEqualTo(RideStatus.COMPLETED);
@@ -567,8 +570,11 @@ class RideServiceTest {
                 completionRequest();
 
         rideService.updateStatus(
-                "ride-1",
-                request);
+                        "ride-1",
+                        request,
+                        "test-admin",
+                        "ADMIN",
+                        "test-token");
 
         ArgumentCaptor<FinalFareRequest> captor =
                 ArgumentCaptor.forClass(
@@ -608,7 +614,10 @@ class RideServiceTest {
         assertThatThrownBy(() ->
                 rideService.updateStatus(
                         "ride-1",
-                        request))
+                        request,
+                        "test-admin",
+                        "ADMIN",
+                        "test-token"))
                 .isInstanceOf(ApiException.class)
                 .satisfies(exception -> {
 
@@ -657,7 +666,10 @@ class RideServiceTest {
         assertThatThrownBy(() ->
                 rideService.updateStatus(
                         "ride-1",
-                        request))
+                        request,
+                        "test-admin",
+                        "ADMIN",
+                        "test-token"))
                 .isInstanceOf(ApiException.class)
                 .satisfies(exception -> {
 
@@ -701,7 +713,10 @@ class RideServiceTest {
         assertThatThrownBy(() ->
                 rideService.updateStatus(
                         "ride-1",
-                        completionRequest()))
+                        completionRequest(),
+                        "test-admin",
+                        "ADMIN",
+                        "test-token"))
                 .isInstanceOf(ApiException.class)
                 .satisfies(exception -> {
 
@@ -760,7 +775,10 @@ class RideServiceTest {
         var response =
                 rideService.updateStatus(
                         "ride-1",
-                        request);
+                        request,
+                        "test-admin",
+                        "ADMIN",
+                        "test-token");
 
         assertThat(response.getStatus())
                 .isEqualTo(RideStatus.CANCELLED);
@@ -790,7 +808,10 @@ class RideServiceTest {
         assertThatThrownBy(() ->
                 rideService.updateStatus(
                         "ride-1",
-                        request))
+                        request,
+                        "test-admin",
+                        "ADMIN",
+                        "test-token"))
                 .isInstanceOf(ApiException.class)
                 .satisfies(exception -> {
 
@@ -829,7 +850,10 @@ class RideServiceTest {
         assertThatThrownBy(() ->
                 rideService.updateStatus(
                         "ride-1",
-                        request))
+                        request,
+                        "test-admin",
+                        "ADMIN",
+                        "test-token"))
                 .isInstanceOf(ApiException.class)
                 .satisfies(exception -> {
 
