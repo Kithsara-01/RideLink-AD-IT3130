@@ -28,7 +28,26 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/accounts")
 @Tag(
         name = "Account Management",
-        description = "APIs for account registration, authentication, profile management, and administrator account management"
+        description = """
+                Manages RideLink user accounts, authentication and account access.
+
+                Main features:
+                - Registration: Create a new RIDER or DRIVER account.
+                - Login: Sign in with email and password and receive a JWT access token.
+                - Profile: View and update the currently logged-in user's profile.
+                - Role Management: ADMIN can change an existing account between supported RIDER and DRIVER roles.
+                - Account Status: ADMIN can activate or deactivate an existing RIDER or DRIVER account.
+                - Account Lookup: ADMIN can find an account using its email address.
+
+                Demo flow:
+                Register -> Login -> Copy accessToken -> Authorize -> Use protected APIs
+
+                Important:
+                - Registration and Login do not require a JWT.
+                - /me identifies the logged-in account automatically from the JWT.
+                - Role, status and email lookup operations require ADMIN access.
+                - Account/User ID is different from a Driver Profile ID.
+                """
 )
 public class AccountController {
 
@@ -43,8 +62,28 @@ public class AccountController {
     }
 
     @Operation(
-            summary = "Register a new account",
-            description = "Creates a new RIDER or DRIVER account."
+            summary = "Register a new RIDER or DRIVER account",
+            description = """
+                    Creates a new account.
+
+                    Authentication:
+                    - No JWT is required.
+
+                    Request:
+                    - fullName: user's name
+                    - email: must be a valid email address
+                    - password: minimum 8 characters
+                    - role: RIDER or DRIVER
+                    - telephoneNumber: optional; when provided, it must contain 7 to 15 digits with an optional leading +
+
+                    After registration:
+                    - Save the returned id. This is the Account/User ID.
+                    - Login using the registered email and password to obtain a JWT.
+
+                    Expected success:
+                    - HTTP 201 Created
+                    - Response includes id, fullName, email, telephoneNumber, role and active.
+                    """
     )
     @PostMapping("/register")
     public ResponseEntity<?> register(
@@ -59,8 +98,27 @@ public class AccountController {
     }
 
     @Operation(
-            summary = "Login to an account",
-            description = "Authenticates an account and returns a JWT access token."
+            summary = "Login and get a JWT access token",
+            description = """
+                    Authenticates an existing account using email and password.
+
+                    Authentication:
+                    - No JWT is required.
+
+                    Expected success:
+                    - HTTP 200 OK
+                    - Response includes accessToken, tokenType, expiresIn and account details.
+
+                    Swagger demo:
+                    1. Execute this login request.
+                    2. Copy the accessToken from the response.
+                    3. Click Authorize at the top of Swagger UI.
+                    4. Enter the JWT in the bearerAuth authorization box.
+                    5. You can then call protected endpoints allowed for that account's role.
+
+                    The Account/User ID returned here is also the JWT subject used to identify
+                    the authenticated account in protected requests.
+                    """
     )
     @PostMapping("/login")
     public ResponseEntity<?> login(
@@ -91,8 +149,23 @@ public class AccountController {
     }
 
     @Operation(
-            summary = "Get current account profile",
-            description = "Returns the profile of the currently authenticated RIDER, DRIVER, or ADMIN.",
+            summary = "Get my account profile",
+            description = """
+                    Returns the profile of the currently authenticated account.
+
+                    Required role:
+                    - RIDER, DRIVER or ADMIN
+
+                    Prerequisite:
+                    - Login first and authorize Swagger using the returned JWT.
+
+                    No Account/User ID is entered in the URL.
+                    The service identifies the account from the JWT subject.
+
+                    Expected success:
+                    - HTTP 200 OK
+                    - Response includes the current account's profile information.
+                    """,
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @GetMapping("/me")
@@ -108,8 +181,22 @@ public class AccountController {
     }
 
     @Operation(
-            summary = "Update current account profile",
-            description = "Updates the profile information of the currently authenticated account.",
+            summary = "Update my account profile",
+            description = """
+                    Updates the full name and telephone number of the currently authenticated account.
+
+                    Required role:
+                    - RIDER, DRIVER or ADMIN
+
+                    Prerequisite:
+                    - Login first and authorize Swagger using the returned JWT.
+
+                    The account is identified from the JWT subject. Do not provide an Account/User ID.
+
+                    Expected success:
+                    - HTTP 200 OK
+                    - Response contains the updated profile.
+                    """,
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @PatchMapping("/me")
@@ -130,7 +217,26 @@ public class AccountController {
 
     @Operation(
             summary = "Find an account by email",
-            description = "Allows an ADMIN to retrieve an account using its email address.",
+            description = """
+                    Retrieves an account using its email address.
+
+                    Required role:
+                    - ADMIN only
+
+                    Prerequisite:
+                    - Login as ADMIN and authorize Swagger using the ADMIN JWT.
+
+                    Path value:
+                    - Replace {email} with the email address of the account you want to retrieve.
+
+                    Expected success:
+                    - HTTP 200 OK
+                    - Response contains the matching account details.
+
+                    Common authorization errors:
+                    - 401 if the JWT is missing or invalid.
+                    - 403 if the authenticated account is not ADMIN.
+                    """,
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @GetMapping("/email/{email}")
@@ -146,8 +252,33 @@ public class AccountController {
     }
 
     @Operation(
-            summary = "Update account status",
-            description = "Allows an ADMIN to activate or deactivate a RIDER or DRIVER account.",
+            summary = "Activate or deactivate an account",
+            description = """
+                    Changes the active status of a RIDER or DRIVER account.
+
+                    Required role:
+                    - ADMIN only
+
+                    Prerequisite:
+                    - Login as ADMIN and authorize Swagger using the ADMIN JWT.
+
+                    ID guidance:
+                    - {accountId} is an Account/User ID.
+                    - Replace it with the id returned by account registration, login or account lookup.
+                    - It is NOT a Driver Profile ID.
+
+                    Request:
+                    - active = true to activate the account.
+                    - active = false to deactivate the account.
+
+                    Expected success:
+                    - HTTP 200 OK
+                    - Response contains the updated account.
+
+                    Common authorization errors:
+                    - 401 if the JWT is missing or invalid.
+                    - 403 if the authenticated account is not ADMIN.
+                    """,
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @PatchMapping("/{accountId}/status")
@@ -168,8 +299,33 @@ public class AccountController {
     }
 
     @Operation(
-            summary = "Update account role",
-            description = "Allows an ADMIN to change an account role between RIDER and DRIVER.",
+            summary = "Change an account role",
+            description = """
+                    Changes an account role between RIDER and DRIVER.
+
+                    Required role:
+                    - ADMIN only
+
+                    Prerequisite:
+                    - Login as ADMIN and authorize Swagger using the ADMIN JWT.
+
+                    ID guidance:
+                    - {accountId} is an Account/User ID.
+                    - Replace it with the id returned by account registration, login or account lookup.
+                    - It is NOT a Driver Profile ID.
+
+                    Supported target roles:
+                    - RIDER
+                    - DRIVER
+
+                    Expected success:
+                    - HTTP 200 OK
+                    - Response contains the account with its updated role.
+
+                    Common authorization errors:
+                    - 401 if the JWT is missing or invalid.
+                    - 403 if the authenticated account is not ADMIN.
+                    """,
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @PatchMapping("/{accountId}/role")

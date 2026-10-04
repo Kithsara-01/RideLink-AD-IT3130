@@ -4,11 +4,14 @@ import com.ridelink.ride.dto.CreateRideRequest;
 import com.ridelink.ride.dto.RideResponse;
 import com.ridelink.ride.dto.UpdateRideStatusRequest;
 import com.ridelink.ride.service.RideService;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
 import jakarta.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,7 +29,10 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/rides")
-@Tag(name = "Ride Management", description = "Ride requests, driver assignment and ride lifecycle management")
+@Tag(
+        name = "Ride Management",
+        description = "Ride requests, driver assignment and ride lifecycle management"
+)
 public class RideController {
 
     private final RideService rideService;
@@ -37,71 +43,143 @@ public class RideController {
 
     @PostMapping
     @Operation(
-        summary = "Create ride request",
-        description = "Creates a requested ride and calculates a transparent distance-based fare estimate"
+            summary = "Create ride request",
+            description = "Creates a requested ride and calculates a transparent distance-based fare estimate"
     )
     @ApiResponses({
-        @ApiResponse(responseCode = "201", description = "Ride created"),
-        @ApiResponse(responseCode = "400", description = "Invalid ride details")
+            @ApiResponse(
+                    responseCode = "201",
+                    description = "Ride created"
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid ride details"
+            )
     })
     public ResponseEntity<RideResponse> createRide(
             @Valid @RequestBody CreateRideRequest request,
             @AuthenticationPrincipal Jwt jwt) {
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(rideService.createRide(request, jwt.getTokenValue()));
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(
+                        rideService.createRide(
+                                request,
+                                jwt.getTokenValue()
+                        )
+                );
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get ride", description = "Retrieves a ride by its stable identifier")
-    public ResponseEntity<RideResponse> getRide(@PathVariable String id) {
-        return ResponseEntity.ok(rideService.getRide(id));
+    @Operation(
+            summary = "Get ride",
+            description = "Retrieves a ride by its stable identifier"
+    )
+    public ResponseEntity<RideResponse> getRide(
+            @PathVariable String id) {
+
+        return ResponseEntity.ok(
+                rideService.getRide(id)
+        );
     }
 
     @GetMapping
-    @Operation(summary = "List rides", description = "Lists rides for a passenger or driver")
+    @Operation(
+            summary = "List rides",
+            description = "Lists rides for a passenger or driver"
+    )
     public ResponseEntity<List<RideResponse>> listRides(
-            @RequestParam(required = false) String passengerId,
-            @RequestParam(required = false) String driverId) {
+            @RequestParam(required = false)
+            String passengerId,
 
-        if (passengerId != null && !passengerId.isBlank()) {
-            return ResponseEntity.ok(rideService.getPassengerRides(passengerId));
+            @RequestParam(required = false)
+            String driverId) {
+
+        if (passengerId != null
+                && !passengerId.isBlank()) {
+
+            return ResponseEntity.ok(
+                    rideService.getPassengerRides(
+                            passengerId
+                    )
+            );
         }
 
-        if (driverId != null && !driverId.isBlank()) {
-            return ResponseEntity.ok(rideService.getDriverRides(driverId));
+        if (driverId != null
+                && !driverId.isBlank()) {
+
+            return ResponseEntity.ok(
+                    rideService.getDriverRides(
+                            driverId
+                    )
+            );
         }
 
-        return ResponseEntity.badRequest().build();
+        return ResponseEntity
+                .badRequest()
+                .build();
     }
 
     @PostMapping("/{id}/assign")
     @Operation(
-        summary = "Assign nearest eligible driver",
-        description = "Synchronously queries Driver & Vehicle Service and locks the selected driver"
+            summary = "Assign nearest eligible driver",
+            description = "Synchronously queries Driver & Vehicle Service and locks the selected driver"
     )
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Driver assigned"),
-        @ApiResponse(responseCode = "409", description = "No driver available or ride is not requestable"),
-        @ApiResponse(responseCode = "503", description = "Driver service unavailable")
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Driver assigned"
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "No driver available or ride is not requestable"
+            ),
+            @ApiResponse(
+                    responseCode = "503",
+                    description = "Driver service unavailable"
+            )
     })
-    public ResponseEntity<RideResponse> assignRide(@PathVariable String id) {
-        return ResponseEntity.ok(rideService.assignRide(id));
+    public ResponseEntity<RideResponse> assignRide(
+            @PathVariable String id) {
+
+        return ResponseEntity.ok(
+                rideService.assignRide(id)
+        );
     }
 
     @PatchMapping("/{id}/status")
     @Operation(
-        summary = "Update ride lifecycle status",
-        description = "Applies valid lifecycle transitions: assigned, accepted, in-progress, completed, or cancelled"
+            summary = "Update ride lifecycle status",
+            description = "Applies authorized and valid lifecycle transitions"
     )
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Ride status updated"),
-        @ApiResponse(responseCode = "409", description = "Invalid status transition")
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Ride status updated"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Caller is not allowed to update this ride"
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Invalid status transition"
+            )
     })
     public ResponseEntity<RideResponse> updateStatus(
             @PathVariable String id,
-            @Valid @RequestBody UpdateRideStatusRequest request) {
+            @Valid @RequestBody
+            UpdateRideStatusRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
 
-        return ResponseEntity.ok(rideService.updateStatus(id, request));
+        return ResponseEntity.ok(
+                rideService.updateStatus(
+                        id,
+                        request,
+                        jwt.getSubject(),
+                        jwt.getClaimAsString("role"),
+                        jwt.getTokenValue()
+                )
+        );
     }
 }

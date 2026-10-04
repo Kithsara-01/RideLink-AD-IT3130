@@ -1,13 +1,16 @@
 package com.ridelink.ride.client;
 
 import com.ridelink.ride.dto.AvailableDriverResponse;
+import com.ridelink.ride.dto.DriverProfileResponse;
 import com.ridelink.ride.entity.VehicleType;
 import com.ridelink.ride.exception.ApiException;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -64,6 +67,70 @@ public class DriverClient {
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {
                     });
+
+        } catch (RestClientException exception) {
+            throw new ApiException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Driver service is unavailable");
+        }
+    }
+
+    public DriverProfileResponse getDriverByUserId(
+            String userId,
+            String bearerToken) {
+
+        if (userId == null
+                || userId.isBlank()
+                || bearerToken == null
+                || bearerToken.isBlank()) {
+
+            throw new ApiException(
+                    HttpStatus.FORBIDDEN,
+                    "Driver identity could not be verified");
+        }
+
+        try {
+            DriverProfileResponse response = restClient.get()
+                    .uri(
+                            "/api/drivers/user/{userId}",
+                            userId)
+                    .header(
+                            HttpHeaders.AUTHORIZATION,
+                            "Bearer " + bearerToken)
+                    .retrieve()
+                    .body(DriverProfileResponse.class);
+
+            if (response == null
+                    || response.id() == null
+                    || response.id().isBlank()
+                    || response.userId() == null
+                    || response.userId().isBlank()
+                    || !userId.equals(response.userId())) {
+
+                throw new ApiException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Driver Service returned an invalid driver profile");
+            }
+
+            return response;
+
+        } catch (HttpClientErrorException.NotFound exception) {
+            throw new ApiException(
+                    HttpStatus.FORBIDDEN,
+                    "Driver profile was not found for the authenticated account");
+
+        } catch (HttpClientErrorException.Unauthorized exception) {
+            throw new ApiException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Driver Service rejected authentication");
+
+        } catch (HttpClientErrorException.Forbidden exception) {
+            throw new ApiException(
+                    HttpStatus.FORBIDDEN,
+                    "Driver Service rejected authorization");
+
+        } catch (ApiException exception) {
+            throw exception;
 
         } catch (RestClientException exception) {
             throw new ApiException(
